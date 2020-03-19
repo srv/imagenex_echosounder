@@ -294,7 +294,7 @@ void TimeoutSerial::read(char *data, size_t size)
 
 			port.cancel();
 
-			throw(timeout_exception("Timeout expired"));
+			throw(timeout_exception("Timeout expired b1"));
 
 		case resultError:
 
@@ -418,7 +418,7 @@ std::string TimeoutSerial::readStringUntil(const std::string& delim)
 
 			port.cancel();
 
-			throw(timeout_exception("Timeout expired"));
+			throw(timeout_exception("Timeout expired b2"));
 
 		case resultError:
 
