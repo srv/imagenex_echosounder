@@ -3,27 +3,36 @@
 #include "sensor_msgs/Range.h"
 #include "TimeoutSerial.h"
 
-class Ecosonda {
+class imagenex_echosounder {
  public:
  
-  Ecosonda(const ros::NodeHandle& nh, const ros::NodeHandle& nhp)
+  imagenex_echosounder(const ros::NodeHandle& nh, const ros::NodeHandle& nhp)
       : nh_(nh), nhp_(nhp), seq_(0)  {
 	// B: ¿Parametros iniciales?
-    nhp_.param("profundidad_minima", profundidad_min, 0.5);
-    nhp_.param("profundidad_maxima", profundidad_max, 5.0);
-    nhp_.param("ganancia", ganancia, 6);
-    nhp_.param("longitud_pulso", long_pulso, 100);
-    nhp_.param("delay", delay, 0);
+    // nhp_.param("profundidad_minima", profundidad_min, 0.5);
+    // nhp_.param("profundidad_maxima", profundidad_max, 5.0);
+    // nhp_.param("ganancia", ganancia, 6);
+    // nhp_.param("longitud_pulso", long_pulso, 100);
+    // nhp_.param("delay", delay, 0);
 
-    range_pub_ = nhp_.advertise<sensor_msgs::Range>("/ecosonda/range", 1); // B: ¿Anuncia un topic/tema de un mensaje? Es usado a la hora de crear el mensaje. Supongo que crea el topic del mensaje.
+    // Get configuration from rosparam server
+    getConfig();
+    ROS_INFO("Profunditat max: %f", profundidad_max);
+	ROS_INFO("Profunditat min: %f", profundidad_min);
+	ROS_INFO("ganancia: %i", ganancia);
+	ROS_INFO("longitud_pulso: %i", long_pulso);
+	ROS_INFO("delay: %i", delay);
+	ROS_INFO("data_points: %i", data_points);
+
+    range_pub_ = nhp_.advertise<sensor_msgs::Range>("/imagenex_echosounder/range", 1); // B: ¿Anuncia un topic/tema de un mensaje? Es usado a la hora de crear el mensaje. Supongo que crea el topic del mensaje.
     
     serial.open(115200); // B: Se abre un puerto serial y se le asigna una velocidad. ¿Que puerto se abre? ¿COM1?
 	serial.setTimeout(boost::posix_time::seconds(5)); // B: No lo entiendo... ¿Es un delay? 
 
     timer_ = nh_.createTimer(ros::Duration(1.0), // B: CreateTimer crea un temporizador. El temporizador usado es el propio de ROS. El temporizador dura 1 s.
-                             &Ecosonda::timerCallback, // B: Se llama al método privado timerCallback.
+                             &imagenex_echosounder::timerCallback, // B: Se llama al método privado timerCallback.
                              this);
-  }
+  	}
 
  private:
   // B: ¿Se llama a este método cada vez que el timer de ROS llega al final y ocurre un "TimerEvent&"?
@@ -56,7 +65,7 @@ class Ecosonda {
 	
 	buffer_tx[0] = 0xFE;		        //Switch Data Header (1st Byte)
 	buffer_tx[1] = 0x44;			    //Switch Data Header (2nd Byte)
-    	buffer_tx[2] = 0x11;	    		//Head ID
+    buffer_tx[2] = 0x11;	    		//Head ID
 	buffer_tx[3] = profundidad_max;		//Range: 5,10,20,30,40,50 in meters
 	buffer_tx[4] = 0;
 	buffer_tx[5] = 0;
@@ -73,7 +82,7 @@ class Ecosonda {
 	buffer_tx[16] = 0;
 	buffer_tx[17] = 0;
 	buffer_tx[18] = 0;					//External Trigger Control
-	buffer_tx[19] = 25;					//Data Points: 25=250 points 'IMX'
+	buffer_tx[19] = data_points;		//Data Points: 25=250 points 'IMX'
 	buffer_tx[20] = 0;
 	buffer_tx[21] = 0;
 	buffer_tx[22] = 0;					//Profile: 0=OFF, 1=IPX output
@@ -85,18 +94,19 @@ class Ecosonda {
 	
 	// B: ¿Mejora la lectura humana de los datos y los metemos en los Buffers rx?
     	// B: ¿Por que escribe y lee automáticamente si despues los datos se envian mediante un mensaje?
-    	serial.write(reinterpret_cast<char*>(buffer_tx), sizeof(buffer_tx)); // B: Escribe el contenido en caracteres y el tamaño del Buffer Tx en el serial 
+    serial.write(reinterpret_cast<char*>(buffer_tx), sizeof(buffer_tx)); // B: Escribe el contenido en caracteres y el tamaño del Buffer Tx en el serial 
 	try {
-	serial.read(reinterpret_cast<char*>(buffer_rx), sizeof(buffer_rx)); // B: Lee el contenido en caracteres y el tamaño del Buffer Rx en el serial ¿Por que? ¿Para que lo pueda leer una persona bien?
-	} catch (...){
-	}
+		serial.read(reinterpret_cast<char*>(buffer_rx), sizeof(buffer_rx)); // B: Lee el contenido en caracteres y el tamaño del Buffer Rx en el serial ¿Por que? ¿Para que lo pueda leer una persona bien?
+		} catch (...){
+		}
+	
 	profundidad = 0.01 * float(((buffer_rx[9] & 0x7F) << 7) | (buffer_rx[8] & 0x7F)); //B: ¿Por que se lee la posición 9 del buffer si siempre es 0?
 	
 	
 	// B: Se crea la trama/mensaje para enviar la información.
 	sensor_msgs::Range msg; // B: ¿Se llama al método Range msg para obtener el topic?
 	msg.header.stamp = ros::Time::now();
-	msg.header.frame_id = "ecosonda";
+	msg.header.frame_id = "imagenex_echosounder";
 	msg.radiation_type = sensor_msgs::Range::ULTRASOUND;
 	msg.field_of_view = 0.1745329252; //10 grados
 	msg.min_range = profundidad_min;
@@ -108,7 +118,7 @@ class Ecosonda {
     	range_pub_.publish(msg);
     
 
-  }
+  	}
   
   
   // B: Declaraciones de variables, buffers, etc.
@@ -131,13 +141,34 @@ class Ecosonda {
   double absorcion;
   int long_pulso; //Longitud de las ondas que envía la ecosonda. Mayores longitudes son para fondos profundos.
   int delay; //Delay para enviar los datos recogidos por la ecosonda por el puerto serie.
+  int data_points;
+  void getConfig() {
+    bool valid_config = true;
+
+    valid_config = valid_config && ros::param::getCached("~profundidad_maxima", profundidad_max);
+    valid_config = valid_config && ros::param::getCached("~profundidad_minima", profundidad_min);
+    valid_config = valid_config && ros::param::getCached("~ganancia", ganancia);
+    valid_config = valid_config && ros::param::getCached("~longitud_pulso", long_pulso);
+    valid_config = valid_config && ros::param::getCached("~delay", delay);
+    valid_config = valid_config && ros::param::getCached("~data_points", data_points);
+    // Shutdown if not valid
+    if (!valid_config) {
+        ROS_FATAL_STREAM("Shutdown due to invalid config parameters!");
+        ros::shutdown();
+    	}
+	}
 };
 
+
+
+
+
+
 int main(int argc, char** argv){
-  ros::init(argc, argv, "ecosonda"); //B: Inicializa el nodo de ros 
+  ros::init(argc, argv, "imagenex_echosounder"); //B: Inicializa el nodo de ros 
   ros::NodeHandle nh; //B: Arranca el nodo publico de ros
   ros::NodeHandle nhp("~"); //B: Arranca un nodo privado. ¿El nodo privado es copia del primero?
-  Ecosonda ec(nh, nhp);
+  imagenex_echosounder ec(nh, nhp);
   ros::spin();
   return 0;
 };

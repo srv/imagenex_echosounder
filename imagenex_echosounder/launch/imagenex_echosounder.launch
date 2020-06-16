@@ -1,0 +1,4 @@
+<launch>
+    <rosparam command="load" file="$(find imagenex_echosounder)/config/imagenex_echosounder.yaml"/>
+    <node pkg="imagenex_echosounder" type="imagenex_echosounder" name="imagenex_echosounder" output="screen" />
+</launch>

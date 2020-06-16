@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(ecosonda)
+project(imagenex_echosounder)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -12,7 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 catkin_package(
    #INCLUDE_DIRS include
-#  LIBRARIES ecosonda
+#  LIBRARIES imagenex_echosounder
   #CATKIN_DEPENDS roscpp std_msgs sensor_msgs
 #  DEPENDS system_lib
 )
@@ -24,14 +24,14 @@ include_directories(
   ${Boost_INCLUDE_DIRS}
 )
 
-#add_library(ecosonda src/TimeoutSerial.cpp)
+#add_library(imagenex_echosounder src/TimeoutSerial.cpp)
 
 
 
-add_executable(ecosonda src/ecosonda_node.cpp
+add_executable(imagenex_echosounder src/imagenex_echosounder_node.cpp
 			src/TimeoutSerial.cpp)
 
-target_link_libraries(ecosonda ${catkin_LIBRARIES}
+target_link_libraries(imagenex_echosounder ${catkin_LIBRARIES}
 			       ${Boost_LIBRARIES})
 
 

@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>ecosonda</name>
+  <name>imagenex_echosounder</name>
   <version>0.0.0</version>
   <description>The ecosonda package</description>
 

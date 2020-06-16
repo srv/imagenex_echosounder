@@ -1,0 +1,10 @@
+# Maximum and minimum pressure for the pressure sensor. Read the datasheet
+imagenex_echosounder/profundidad_maxima: 0.5
+imagenex_echosounder/profundidad_minima: 25.0
+
+imagenex_echosounder/ganancia: 19
+
+imagenex_echosounder/longitud_pulso: 200
+imagenex_echosounder/delay: 0
+imagenex_echosounder/data_points: 25
+
