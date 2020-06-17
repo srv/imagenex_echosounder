@@ -41,25 +41,33 @@ class imagenex_echosounder {
 	 // B: Posible Breakpoint... Pasaremos por aquí cada segundo...
 	// B: Pre-tratamiento de los datos
 	// B: ¿Por que se hacen estos redondeos tan brutales? 
-	if(profundidad_max < 7.5) profundidad_max = 5.0;
-    else if (profundidad_max < 15.0) profundidad_max = 10.0;
-    else if (profundidad_max < 25.0) profundidad_max = 20.0;
-    else if (profundidad_max < 35.0) profundidad_max = 30.0;
-    else if (profundidad_max < 45.0) profundidad_max = 40.0;
-    else profundidad_max = 50.0;
+	// if(profundidad_max < 7.5) profundidad_max = 5.0;
+ //    else if (profundidad_max < 15.0) profundidad_max = 10.0;
+ //    else if (profundidad_max < 25.0) profundidad_max = 20.0;
+ //    else if (profundidad_max < 35.0) profundidad_max = 30.0;
+ //    else if (profundidad_max < 45.0) profundidad_max = 40.0;
+ //    else profundidad_max = 50.0;
             
+    // sanity checks according to the technical specifications included in the datasheet. 
+
     if(profundidad_min < 0) profundidad_min = 0;
     else if (profundidad_min > 25.0) profundidad_min = 25.0; // B: ¿Por que el mínimo es de 25.0 m? 
+    //eco sounder kit manual, pg 23: Byte 15 Profile Minimum Range Minimum range for profile point digitization
+    //0 – 250  0 to 25 meters in 0.1 meter increments
+    // Byte 15 = min range in meters / 10
             
     if(ganancia > 40) ganancia = 40;
-    else if(ganancia < 0) ganancia = 0;
+    else if(ganancia < 0) ganancia = 0; //Start Gain: 0 to 40dB in 1 dB increments, see data sheet
     
-	// B: El rango del pulso es de 1 a 255. Pero ¿por que se considera 253=254?
+	// # longitud_pulso --> Byte 14 Pulse Length, Length of acoustic transmit pulse. 1-255. 1 to 255 micro sec in 1 micro sec increments
+
     if (long_pulso >255) long_pulso = 255;
-    else if (long_pulso == 253) long_pulso = 254;
+    //else if (long_pulso == 253) long_pulso = 254;
 	else if (long_pulso < 1) long_pulso = 1;
             
     if(delay/2 == 253) delay = 508; // B: Ajuste para que el delay de 253 sea el del 254.
+    //Datasheet: The echo sounder can be commanded to pause (from 0 to 510 msec) before sending its return data to allow the commanding program
+	// enough time to setup for serial reception of the return data. 0 to 255 in 2 msec increments Byte 24 = delay_in_milliseconds/2 Do not use a value of 253!
     
 	// B: una vez que los datos son pre-tratados los metemos en los buffers
 	
@@ -71,7 +79,7 @@ class imagenex_echosounder {
 	buffer_tx[5] = 0;
 	buffer_tx[6] = 0x43;				//Master/Slave: Slave mode only (0x43)
 	buffer_tx[7] = 0;
-	buffer_tx[8] = ganancia;			//Start Gain: 0 to 40dB in 1 dB increments
+	buffer_tx[8] = ganancia;			//Start Gain: 0 to 40dB in 1 dB increments, ecosound kit manual ,pg 23
 	buffer_tx[9] = 0;
 	buffer_tx[10] = 20;					//Absorption: 20 = 0.2dB/m for 675kHz
 	buffer_tx[11] = 0;
@@ -115,7 +123,7 @@ class imagenex_echosounder {
 	ROS_INFO("Profunditat max: %f", msg.max_range);
 	ROS_INFO("Profunditat min: %f", msg.min_range);
 	ROS_INFO("Profunditat: %f", msg.range);
-    	range_pub_.publish(msg);
+    range_pub_.publish(msg);
     
 
   	}
