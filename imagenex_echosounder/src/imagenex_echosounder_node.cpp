@@ -16,20 +16,22 @@ class imagenex_echosounder {
     // nhp_.param("delay", delay, 0);
 
     // Get configuration from rosparam server
-    getConfig();
-    ROS_INFO("Profunditat max: %f", profundidad_max);
+  getConfig();
+  ROS_INFO("Profunditat max: %f", profundidad_max);
 	ROS_INFO("Profunditat min: %f", profundidad_min);
 	ROS_INFO("ganancia: %i", ganancia);
 	ROS_INFO("longitud_pulso: %i", long_pulso);
 	ROS_INFO("delay: %i", delay);
 	ROS_INFO("data_points: %i", data_points);
+  ROS_INFO("timeoutSerial: %i", timeoutSerial);
+  ROS_INFO("timerDuration: %f", timerDuration);
 
-    range_pub_ = nhp_.advertise<sensor_msgs::Range>("/imagenex_echosounder/range", 1); // B: ¿Anuncia un topic/tema de un mensaje? Es usado a la hora de crear el mensaje. Supongo que crea el topic del mensaje.
+  range_pub_ = nhp_.advertise<sensor_msgs::Range>("/imagenex_echosounder/range", 1); // B: ¿Anuncia un topic/tema de un mensaje? Es usado a la hora de crear el mensaje. Supongo que crea el topic del mensaje.
     
-    serial.open(115200); // B: Se abre un puerto serial y se le asigna una velocidad. ¿Que puerto se abre? ¿COM1?
-	serial.setTimeout(boost::posix_time::seconds(5)); // B: No lo entiendo... ¿Es un delay? 
+  serial.open(115200); // B: Se abre un puerto serial y se le asigna una velocidad. ¿Que puerto se abre? ¿COM1?
+	serial.setTimeout(boost::posix_time::seconds(timeoutSerial)); // B: No lo entiendo... ¿Es un delay? 
 
-    timer_ = nh_.createTimer(ros::Duration(1.0), // B: CreateTimer crea un temporizador. El temporizador usado es el propio de ROS. El temporizador dura 1 s.
+  timer_ = nh_.createTimer(ros::Duration(timerDuration), // B: CreateTimer crea un temporizador. El temporizador usado es el propio de ROS. El temporizador dura 1 s.
                              &imagenex_echosounder::timerCallback, // B: Se llama al método privado timerCallback.
                              this);
   	}
@@ -150,6 +152,9 @@ class imagenex_echosounder {
   int long_pulso; //Longitud de las ondas que envía la ecosonda. Mayores longitudes son para fondos profundos.
   int delay; //Delay para enviar los datos recogidos por la ecosonda por el puerto serie.
   int data_points;
+  int timeoutSerial; 
+  double timerDuration; 
+
   void getConfig() {
     bool valid_config = true;
 
@@ -159,6 +164,8 @@ class imagenex_echosounder {
     valid_config = valid_config && ros::param::getCached("~longitud_pulso", long_pulso);
     valid_config = valid_config && ros::param::getCached("~delay", delay);
     valid_config = valid_config && ros::param::getCached("~data_points", data_points);
+    valid_config = valid_config && ros::param::getCached("~timeoutSerial", timeoutSerial);
+    valid_config = valid_config && ros::param::getCached("~timerDuration", timerDuration);
     // Shutdown if not valid
     if (!valid_config) {
         ROS_FATAL_STREAM("Shutdown due to invalid config parameters!");
