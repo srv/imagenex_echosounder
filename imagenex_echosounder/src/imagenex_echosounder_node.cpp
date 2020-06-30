@@ -65,7 +65,7 @@ class imagenex_echosounder {
 
     if (long_pulso >255) long_pulso = 255;
     //else if (long_pulso == 253) long_pulso = 254;
-	else if (long_pulso < 1) long_pulso = 1;
+	  else if (long_pulso < 1) long_pulso = 1;
             
     if(delay/2 == 253) delay = 508; // B: Ajuste para que el delay de 253 sea el del 254.
     //Datasheet: The echo sounder can be commanded to pause (from 0 to 510 msec) before sending its return data to allow the commanding program
@@ -73,62 +73,75 @@ class imagenex_echosounder {
     
 	// B: una vez que los datos son pre-tratados los metemos en los buffers
 	
-	buffer_tx[0] = 0xFE;		        //Switch Data Header (1st Byte)
-	buffer_tx[1] = 0x44;			    //Switch Data Header (2nd Byte)
+	  buffer_tx[0] = 0xFE;		        //Switch Data Header (1st Byte)
+	  buffer_tx[1] = 0x44;			    //Switch Data Header (2nd Byte)
     buffer_tx[2] = 0x11;	    		//Head ID
-	buffer_tx[3] = profundidad_max;		//Range: 5,10,20,30,40,50 in meters
-	buffer_tx[4] = 0;
-	buffer_tx[5] = 0;
-	buffer_tx[6] = 0x43;				//Master/Slave: Slave mode only (0x43)
-	buffer_tx[7] = 0;
-	buffer_tx[8] = ganancia;			//Start Gain: 0 to 40dB in 1 dB increments, ecosound kit manual ,pg 23
-	buffer_tx[9] = 0;
-	buffer_tx[10] = 20;					//Absorption: 20 = 0.2dB/m for 675kHz
-	buffer_tx[11] = 0;
-	buffer_tx[12] = 0;
-	buffer_tx[13] = 0;
-	buffer_tx[14] = long_pulso;			//Pulse Length: 100 microseconds
-	buffer_tx[15] = profundidad_min*10; //Minimun Range: 0-25m in 0.1 increments
-	buffer_tx[16] = 0;
-	buffer_tx[17] = 0;
-	buffer_tx[18] = 0;					//External Trigger Control
-	buffer_tx[19] = data_points;		//Data Points: 25=250 points 'IMX'
-	buffer_tx[20] = 0;
-	buffer_tx[21] = 0;
-	buffer_tx[22] = 0;					//Profile: 0=OFF, 1=IPX output
-	buffer_tx[23] = 0;
-	buffer_tx[24] = delay/2;			//Switch Delay: (delay in milliseconds)/2
-	buffer_tx[25] = 0;					//Frequency: 0=675kHz
-	buffer_tx[26] = 0xFD;				//Termination Byte - always 0xFD
+	  buffer_tx[3] = profundidad_max;		//Range: 5,10,20,30,40,50 in meters
+	  buffer_tx[4] = 0;
+	  buffer_tx[5] = 0;
+	  buffer_tx[6] = 0x43;				//Master/Slave: Slave mode only (0x43)
+	  buffer_tx[7] = 0;
+	  buffer_tx[8] = ganancia;			//Start Gain: 0 to 40dB in 1 dB increments, ecosound kit manual ,pg 23
+	  buffer_tx[9] = 0;
+	  buffer_tx[10] = 20;					//Absorption: 20 = 0.2dB/m for 675kHz
+	  buffer_tx[11] = 0;
+	  buffer_tx[12] = 0;
+	  buffer_tx[13] = 0;
+	  buffer_tx[14] = long_pulso;			//Pulse Length: 100 microseconds
+	  buffer_tx[15] = profundidad_min*10; //Minimun Range: 0-25m in 0.1 increments
+	  buffer_tx[16] = 0;
+	  buffer_tx[17] = 0;
+	  buffer_tx[18] = 0;					//External Trigger Control
+	  buffer_tx[19] = data_points;		//Data Points: 25=250 points 'IMX'
+	  buffer_tx[20] = 0;
+	  buffer_tx[21] = 0;
+	  buffer_tx[22] = 0;					//Profile: 0=OFF, 1=IPX output
+	  buffer_tx[23] = 0;
+	  buffer_tx[24] = delay/2;			//Switch Delay: (delay in milliseconds)/2
+	  buffer_tx[25] = 0;					//Frequency: 0=675kHz
+	  buffer_tx[26] = 0xFD;				//Termination Byte - always 0xFD
+	  return_data_received=false;
 	
-	
-	// B: ¿Mejora la lectura humana de los datos y los metemos en los Buffers rx?
-    	// B: ¿Por que escribe y lee automáticamente si despues los datos se envian mediante un mensaje?
+	 // B: ¿Mejora la lectura humana de los datos y los metemos en los Buffers rx?
+    	// B: ¿Por que escribe y lee automáticamente si despues los datos se envian mediante un mensaje? 
+
+    // enviar solo si se ha recibido la respuesta del anterior. fbf 30/06/2020
+    
+  
     serial.write(reinterpret_cast<char*>(buffer_tx), sizeof(buffer_tx)); // B: Escribe el contenido en caracteres y el tamaño del Buffer Tx en el serial 
-	try {
-		serial.read(reinterpret_cast<char*>(buffer_rx), sizeof(buffer_rx)); // B: Lee el contenido en caracteres y el tamaño del Buffer Rx en el serial ¿Por que? ¿Para que lo pueda leer una persona bien?
-		} catch (...){
-		}
+	  try {
+	 	 serial.read(reinterpret_cast<char*>(buffer_rx), sizeof(buffer_rx)); // B: Lee el contenido en caracteres y el tamaño del Buffer Rx en el serial ¿Por que? ¿Para que lo pueda leer una persona bien?
+	 	} catch (...){
+	 	}
+
+    profundidad = 0.01 * float(((buffer_rx[9] & 0x7F) << 7) | (buffer_rx[8] & 0x7F)); //B: ¿Por que se lee la posición 9 del buffer si siempre es 0?
+      
+    if (profundidad>0.00){
+        return_data_received=true;
+
+        // B: Se crea la trama/mensaje para enviar la información.
+        sensor_msgs::Range msg; // B: ¿Se llama al método Range msg para obtener el topic?
+        msg.header.stamp = ros::Time::now();
+        msg.header.frame_id = "imagenex_echosounder";
+        msg.radiation_type = sensor_msgs::Range::ULTRASOUND;
+        msg.field_of_view = 0.1745329252; //10 grados
+        msg.min_range = profundidad_min;
+        msg.max_range = profundidad_max;
+        msg.range = profundidad;
+        ROS_INFO("Profunditat max: %f", msg.max_range);
+        ROS_INFO("Profunditat min: %f", msg.min_range);
+        ROS_INFO("Profunditat: %f", msg.range);
+        range_pub_.publish(msg);
+    }
+    else{
+      ROS_INFO("Profunditat: %f. No range published. Either return serial data not received or out of maximum range. ", profundidad);
+    }
+	 
+
 	
-	profundidad = 0.01 * float(((buffer_rx[9] & 0x7F) << 7) | (buffer_rx[8] & 0x7F)); //B: ¿Por que se lee la posición 9 del buffer si siempre es 0?
-	
-	
-	// B: Se crea la trama/mensaje para enviar la información.
-	sensor_msgs::Range msg; // B: ¿Se llama al método Range msg para obtener el topic?
-	msg.header.stamp = ros::Time::now();
-	msg.header.frame_id = "imagenex_echosounder";
-	msg.radiation_type = sensor_msgs::Range::ULTRASOUND;
-	msg.field_of_view = 0.1745329252; //10 grados
-	msg.min_range = profundidad_min;
-	msg.max_range = profundidad_max;
-	msg.range = profundidad;
-	ROS_INFO("Profunditat max: %f", msg.max_range);
-	ROS_INFO("Profunditat min: %f", msg.min_range);
-	ROS_INFO("Profunditat: %f", msg.range);
-    range_pub_.publish(msg);
     
 
-  	}
+  }
   
   
   // B: Declaraciones de variables, buffers, etc.
@@ -140,7 +153,7 @@ class imagenex_echosounder {
   int64_t seq_;
   
   TimeoutSerial serial;
-  
+
   unsigned char buffer_rx[265];
   unsigned char buffer_tx[27];
   double profundidad;
@@ -154,6 +167,7 @@ class imagenex_echosounder {
   int data_points;
   int timeoutSerial; 
   double timerDuration; 
+  bool return_data_received;
 
   void getConfig() {
     bool valid_config = true;
