@@ -10,13 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 #find_package(Boost REQUIRED COMPONENTS system)
 
-catkin_package(
-   #INCLUDE_DIRS include
-#  LIBRARIES imagenex_echosounder
-  #CATKIN_DEPENDS roscpp std_msgs sensor_msgs
-#  DEPENDS system_lib
-)
-
+catkin_package()
 
 include_directories(
  include
@@ -24,14 +18,9 @@ include_directories(
   ${Boost_INCLUDE_DIRS}
 )
 
-#add_library(imagenex_echosounder src/TimeoutSerial.cpp)
+set(HEADER_FILES
+    "${CMAKE_CURRENT_LIST_DIR}/src/include/TimeoutSerial.h")
 
-
-
-add_executable(imagenex_echosounder src/imagenex_echosounder_node.cpp
-			src/TimeoutSerial.cpp)
-
-target_link_libraries(imagenex_echosounder ${catkin_LIBRARIES}
-			       ${Boost_LIBRARIES})
-
-
+add_executable(imagenex_echosounder src/imagenex_echosounder_node.cpp src/TimeoutSerial.cpp)
+target_link_libraries(imagenex_echosounder ${catkin_LIBRARIES})
+add_dependencies(imagenex_echosounder ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
