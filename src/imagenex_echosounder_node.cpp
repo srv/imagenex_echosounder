@@ -7,61 +7,41 @@ class imagenex_echosounder {
  public:
  
   imagenex_echosounder(const ros::NodeHandle& nh, const ros::NodeHandle& nhp)
-      : nh_(nh), nhp_(nhp), seq_(0)  {
-	// B: ¿Parametros iniciales?
-    // nhp_.param("profundidad_minima", profundidad_min, 0.5);
-    // nhp_.param("profundidad_maxima", profundidad_max, 5.0);
-    // nhp_.param("ganancia", ganancia, 6);
-    // nhp_.param("longitud_pulso", long_pulso, 100);
-    // nhp_.param("delay", delay, 0);
+      : nh_(nh), nhp_(nhp), seq_(0)  
+    {
 
     // Get configuration from rosparam server
-  getConfig();
-  ROS_INFO("Profunditat max: %f", profundidad_max);
-	ROS_INFO("Profunditat min: %f", profundidad_min);
-	ROS_INFO("ganancia: %i", ganancia);
-	ROS_INFO("longitud_pulso: %i", long_pulso);
-	ROS_INFO("delay: %i", delay);
-	ROS_INFO("data_points: %i", data_points);
-  ROS_INFO("timeoutSerial: %i", timeoutSerial);
-  ROS_INFO("timerDuration: %f", timerDuration);
+    getConfig();
+    ROS_INFO("Profunditat max: %f", profundidad_max);
+	  ROS_INFO("Profunditat min: %f", profundidad_min);
+	  ROS_INFO("ganancia: %i", ganancia);
+	  ROS_INFO("longitud_pulso: %i", long_pulso);
+	  ROS_INFO("delay: %i", delay);
+	  ROS_INFO("data_points: %i", data_points);
+    ROS_INFO("timeoutSerial: %i", timeoutSerial);
+    ROS_INFO("timerDuration: %f", timerDuration);
+    ROS_INFO("range percentage: %f", range_percentage);
 
-  altitude_raw_pub_ = nhp_.advertise<sensor_msgs::Range>("altitude_raw", 1); // B: ¿Anuncia un topic/tema de un mensaje? Es usado a la hora de crear el mensaje. Supongo que crea el topic del mensaje.
-  altitude_filtered_pub_ = nhp_.advertise<sensor_msgs::Range>("altitude_filtered", 1); 
-  // Setup DVL callback
-  // dvl_sub_ = nh.subscribe("dvl", 10, &imagenex_echosounder::DVLCb, this);
+    altitude_raw_pub_ = nhp_.advertise<sensor_msgs::Range>("altitude_raw", 1); 
+    altitude_filtered_pub_ = nhp_.advertise<sensor_msgs::Range>("altitude_filtered", 1); 
+    serial.open(115200); // open serial port and set it velocity. 
+	  serial.setTimeout(boost::posix_time::seconds(timeoutSerial)); // set the timeout of the serial port 
 
-  serial.open(115200); // B: Se abre un puerto serial y se le asigna una velocidad. ¿Que puerto se abre? ¿COM1?
-	serial.setTimeout(boost::posix_time::seconds(timeoutSerial)); // B: No lo entiendo... ¿Es un delay? 
-
-  timer_ = nh_.createTimer(ros::Duration(timerDuration), // B: CreateTimer crea un temporizador. El temporizador usado es el propio de ROS. El temporizador dura 1 s.
-                             &imagenex_echosounder::timerCallback, // B: Se llama al método privado timerCallback.
+    timer_ = nh_.createTimer(ros::Duration(timerDuration), // Create a ROS timer with timerDuration.
+                             &imagenex_echosounder::timerCallback, 
                              this);
+    profundidad_anterior = 0.0; 
   	}
 
  private:
-  // B: ¿Se llama a este método cada vez que el timer de ROS llega al final y ocurre un "TimerEvent&"?
-
-  // void imagenex_echosounder::DVLCb(const sensor_msgs::Range& dvl){
-  //   double dvl_alt = dvl_range->range;
-  // }
-  void timerCallback(const ros::TimerEvent&) {
-	 // B: Posible Breakpoint... Pasaremos por aquí cada segundo...
-	// B: Pre-tratamiento de los datos
-	// B: ¿Por que se hacen estos redondeos tan brutales? 
-	// if(profundidad_max < 7.5) profundidad_max = 5.0;
- //    else if (profundidad_max < 15.0) profundidad_max = 10.0;
- //    else if (profundidad_max < 25.0) profundidad_max = 20.0;
- //    else if (profundidad_max < 35.0) profundidad_max = 30.0;
- //    else if (profundidad_max < 45.0) profundidad_max = 40.0;
- //    else profundidad_max = 50.0;
-            
+  void timerCallback(const ros::TimerEvent&) 
+  {      
     // sanity checks according to the technical specifications included in the datasheet. 
 
     if(profundidad_min < 0) profundidad_min = 0;
-    else if (profundidad_min > 25.0) profundidad_min = 25.0; // B: ¿Por que el mínimo es de 25.0 m? 
+    else if (profundidad_min > 25.0) profundidad_min = 25.0; 
     //eco sounder kit manual, pg 23: Byte 15 Profile Minimum Range Minimum range for profile point digitization
-    //0 – 250  0 to 25 meters in 0.1 meter increments
+    //0 – 250 ; 0 to 25 meters in 0.1 meter increments
     // Byte 15 = min range in meters / 10
             
     if(ganancia > 40) ganancia = 40;
@@ -70,14 +50,15 @@ class imagenex_echosounder {
 	// # longitud_pulso --> Byte 14 Pulse Length, Length of acoustic transmit pulse. 1-255. 1 to 255 micro sec in 1 micro sec increments
 
     if (long_pulso >255) long_pulso = 255;
-    //else if (long_pulso == 253) long_pulso = 254;
+    else if (long_pulso == 253) long_pulso = 254; // Do not Comment this setting. It is mandatory.
 	  else if (long_pulso < 1) long_pulso = 1;
             
-    if(delay/2 == 253) delay = 508; // B: Ajuste para que el delay de 253 sea el del 254.
-    //Datasheet: The echo sounder can be commanded to pause (from 0 to 510 msec) before sending its return data to allow the commanding program
+    if(delay/2 == 253) delay = 508; 
+    //see Datasheet: The echo sounder can be commanded to pause (from 0 to 510 msec) before sending its return data to allow the commanding program
     // enough time to setup for serial reception of the return data. 0 to 255 in 2 msec increments Byte 24 = delay_in_milliseconds/2 Do not use a value of 253!
       
-    // B: una vez que los datos son pre-tratados los metemos en los buffers
+    // Set the values of the Switch message. The Switch message is the message from computer to Echosounder to 
+    // pull a range message from the Echosounder. 
     
     buffer_tx[0] = 0xFE;		        //Switch Data Header (1st Byte)
     buffer_tx[1] = 0x44;			    //Switch Data Header (2nd Byte)
@@ -108,19 +89,17 @@ class imagenex_echosounder {
     buffer_tx[26] = 0xFD;				//Termination Byte - always 0xFD
     
     
-	// B: ¿Mejora la lectura humana de los datos y los metemos en los Buffers rx?
-    	// B: ¿Por que escribe y lee automáticamente si despues los datos se envian mediante un mensaje?
-    serial.write(reinterpret_cast<char*>(buffer_tx), sizeof(buffer_tx)); // B: Escribe el contenido en caracteres y el tamaño del Buffer Tx en el serial 
+    serial.write(reinterpret_cast<char*>(buffer_tx), sizeof(buffer_tx)); // write the Switch message in the serial port
     try {
-      serial.read(reinterpret_cast<char*>(buffer_rx), sizeof(buffer_rx)); // B: Lee el contenido en caracteres y el tamaño del Buffer Rx en el serial ¿Por que? ¿Para que lo pueda leer una persona bien?
-      } catch (...){
-      }
+      serial.read(reinterpret_cast<char*>(buffer_rx), sizeof(buffer_rx)); // read the data buffer received in the serial port
+    } catch (...)
+    {
+    }
 	
-    profundidad = 0.01 * float(((buffer_rx[9] & 0x7F) << 7) | (buffer_rx[8] & 0x7F)); //B: ¿Por que se lee la posición 9 del buffer si siempre es 0?
+    profundidad = 0.01 * float(((buffer_rx[9] & 0x7F) << 7) | (buffer_rx[8] & 0x7F)); 
     
     // Publish raw measurement
-    // B: Se crea la trama/mensaje para enviar la información.
-    sensor_msgs::Range msg; // B: ¿Se llama al método Range msg para obtener el topic?
+    sensor_msgs::Range msg;
     msg.header.stamp = ros::Time::now();
     msg.header.frame_id = "echosounder";
     msg.radiation_type = sensor_msgs::Range::ULTRASOUND;
@@ -135,15 +114,21 @@ class imagenex_echosounder {
 
     // Publish filtered measurement
     // Filter zeros
-    if (profundidad != 0 and profundidad <= profundidad_max and profundidad >= profundidad_min)
+
+    double diff_ranges = fabs(profundidad - profundidad_anterior) * 100 /profundidad; // in percentage
+    // double diff_ranges = fabs(profundidad - profundidad_anterior); // in absolute value in m
+
+    if (diff_ranges< range_percentage and profundidad != 0 and profundidad <= profundidad_max and profundidad >= profundidad_min)
     {
       altitude_filtered_pub_.publish(msg);
-    }
-    
-  	}
+      profundidad_anterior=profundidad; // updating the value of this variable only when the message is published 
+      //avoids the possibility of having 2 or 3 consecutive outliers, assuming that the vehicle altitude will not change abruptly   
+    } // on the other hand, if the sensor gets lost (value ==> 0.00) during a certain period, the new data could be 
+      // far from the last stored and valid range, and this will prevent the publication of further range samples.    
+  } // an initialization proceduce in case of loss is needed to prevent this latter case.
   
   
-  // B: Declaraciones de variables, buffers, etc.
+  // declaration of private variables, buffers, etc.
   ros::NodeHandle nh_;
   ros::NodeHandle nhp_;
   ros::Publisher altitude_raw_pub_;
@@ -155,17 +140,17 @@ class imagenex_echosounder {
   
   unsigned char buffer_rx[265];
   unsigned char buffer_tx[27];
-  double profundidad;
-  double profundidad_min;//Distancia mínima la cual la ecosonda digitaliza la señal analógica recibida.
-			// Digitalizar la señal sirve para obtener un perfil del fondo marino y poder cuantificarlo.
-  double profundidad_max;
-  int ganancia; //Amplifica la señal obtenida pero también el ruido (También llamado sensibilidad)
+  double profundidad, profundidad_anterior;
+  double profundidad_min;// minimum distance detected by the sensor.
+  double profundidad_max; // maximum range: 5, 10, 20
+  int ganancia; // amplifies the received signal
   double absorcion;
-  int long_pulso; //Longitud de las ondas que envía la ecosonda. Mayores longitudes son para fondos profundos.
-  int delay; //Delay para enviar los datos recogidos por la ecosonda por el puerto serie.
+  int long_pulso; // pulse lenght. Greated lenghts for greater distances.
+  int delay; 
   int data_points;
   int timeoutSerial; 
   double timerDuration; 
+  double range_percentage;
 
   void getConfig() {
     bool valid_config = true;
@@ -178,6 +163,7 @@ class imagenex_echosounder {
     valid_config = valid_config && ros::param::getCached("~data_points", data_points);
     valid_config = valid_config && ros::param::getCached("~timeoutSerial", timeoutSerial);
     valid_config = valid_config && ros::param::getCached("~timerDuration", timerDuration);
+    valid_config = valid_config && ros::param::getCached("~range_percentage", range_percentage);
     // Shutdown if not valid
     if (!valid_config) {
         ROS_FATAL_STREAM("Shutdown due to invalid config parameters!");
@@ -188,9 +174,9 @@ class imagenex_echosounder {
 
 
 int main(int argc, char** argv){
-  ros::init(argc, argv, "imagenex_echosounder"); //B: Inicializa el nodo de ros 
-  ros::NodeHandle nh; //B: Arranca el nodo publico de ros
-  ros::NodeHandle nhp("~"); //B: Arranca un nodo privado. ¿El nodo privado es copia del primero?
+  ros::init(argc, argv, "imagenex_echosounder"); 
+  ros::NodeHandle nh; 
+  ros::NodeHandle nhp("~"); 
   imagenex_echosounder ec(nh, nhp);
   ros::spin();
   return 0;

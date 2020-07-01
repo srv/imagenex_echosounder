@@ -4,7 +4,8 @@
 # Byte 15 = min range in meters / 10
 # profundidad_maxima ==> //Range: 5,10,20,30,40,50 in meters. Defined in the technical specs of the manufacturer 
 # Start Gain: 0 to 40dB in 1 dB increments,
-# longitud_pulso --> Byte 14 Pulse Length, Length of acoustic transmit pulse. 1-255. 1 to 255 micro sec in 1 micro sec increments
+# longitud_pulso --> Byte 14 Pulse Length, Length of acoustic transmit pulse. 1-255. 1 to 255 micro sec in 1 micro sec increments. 
+# Greated lenghts for greater distances
 # The external trigger must be a 0 to 5 volt TTL pulse with a minimum length of 100 microseconds.
 # Switch Delay: The echo sounder can be commanded to pause (from 0 to 510 msec). Before sending its return data to allow the commanding program enough time to setup for serial reception of the return data.
 # 0 to 255 in 2 msec increments Byte 24 = delay_in_milliseconds/2 . Do not use a value of 253!
@@ -12,6 +13,9 @@
 # timeoutSerial : timeout of the serial port, integer
 # timerDuration: time between timer interruptions. Decimal, in seconds. The timer check outs the serial port, introduces the input frame and waits for the inpunt data. 
 # timerDuration is the period between calls to the timer callback. For example, if this is ros::Duration(0.1), the callback will be scheduled for every 1/10th of a second
+# range_percentage is the percentage over the current range that the difference between previous and current ranges represents
+# if the difference between the current and the previous range represents a percentage over the current range greater than 
+# this value, the new range will not be published. 
 
 imagenex_echosounder/profundidad_maxima: 10.0
 imagenex_echosounder/profundidad_minima: 0.5
@@ -21,4 +25,4 @@ imagenex_echosounder/delay: 2
 imagenex_echosounder/data_points: 25
 imagenex_echosounder/timeoutSerial: 1
 imagenex_echosounder/timerDuration: 0.5
-
+imagenex_echosounder/range_percentage: 20
