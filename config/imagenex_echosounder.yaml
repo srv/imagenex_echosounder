@@ -26,3 +26,4 @@ imagenex_echosounder/data_points: 25
 imagenex_echosounder/timeoutSerial: 1
 imagenex_echosounder/timerDuration: 0.5
 imagenex_echosounder/range_percentage: 20
+imagenex_echosounder/sample_vector_size: 20

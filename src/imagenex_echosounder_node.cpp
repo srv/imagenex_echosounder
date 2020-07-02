@@ -2,6 +2,7 @@
 #include "ros/ros.h"
 #include "sensor_msgs/Range.h"
 #include "TimeoutSerial.h"
+#include <numeric>      // std::accumulate
 
 class imagenex_echosounder {
  public:
@@ -117,14 +118,30 @@ class imagenex_echosounder {
 
     double diff_ranges = fabs(profundidad - profundidad_anterior) * 100 /profundidad; // in percentage
     // double diff_ranges = fabs(profundidad - profundidad_anterior); // in absolute value in m
+    if(sample_counter <= sample_vector_size){ // vector of samples to check if the sensor gets lost (range= 0.00) during a number of samples. 
+      sample_vector.push_back(profundidad); 
+      sample_counter++;
+    }else{
+      sample_counter=0;
+      average = accumulate( sample_vector.begin(), sample_vector.end(), 0.0) / sample_vector_size; 
+      if (average ==0.00){  // got lost during sample_vector_size sensor samples. All samples = 0.00. 
+        gotlost = true; // this varialbe is set after sample_vector_size samples equal to 0 have been detected.
+        ROS_WARN("Echosounder Got Lost during: %i samples", sample_vector_size);
+      }
+    }
 
-    if (diff_ranges< range_percentage and profundidad != 0 and profundidad <= profundidad_max and profundidad >= profundidad_min)
+
+    if (!gotlost and diff_ranges< range_percentage and profundidad != 0 and profundidad <= profundidad_max and profundidad >= profundidad_min)
     {
       altitude_filtered_pub_.publish(msg);
       profundidad_anterior=profundidad; // updating the value of this variable only when the message is published 
       //avoids the possibility of having 2 or 3 consecutive outliers, assuming that the vehicle altitude will not change abruptly   
     } // on the other hand, if the sensor gets lost (value ==> 0.00) during a certain period, the new data could be 
-      // far from the last stored and valid range, and this will prevent the publication of further range samples.    
+      // far from the last stored and valid range, and this will prevent the publication of further range samples.
+    if (gotlost and profundidad != 0 and profundidad <= profundidad_max and profundidad >= profundidad_min) {
+      altitude_filtered_pub_.publish(msg); // publish next range after recovered 
+      profundidad_anterior=profundidad; // initialize the value of profundidad_anterior with the last published range
+      }
   } // an initialization proceduce in case of loss is needed to prevent this latter case.
   
   
@@ -151,6 +168,11 @@ class imagenex_echosounder {
   int timeoutSerial; 
   double timerDuration; 
   double range_percentage;
+  int sample_vector_size;
+  std::vector<double> sample_vector; 
+  int sample_counter=0;
+  double average;
+  bool gotlost = false;
 
   void getConfig() {
     bool valid_config = true;
@@ -164,6 +186,7 @@ class imagenex_echosounder {
     valid_config = valid_config && ros::param::getCached("~timeoutSerial", timeoutSerial);
     valid_config = valid_config && ros::param::getCached("~timerDuration", timerDuration);
     valid_config = valid_config && ros::param::getCached("~range_percentage", range_percentage);
+    valid_config = valid_config && ros::param::getCached("~range_percentage", sample_vector_size);
     // Shutdown if not valid
     if (!valid_config) {
         ROS_FATAL_STREAM("Shutdown due to invalid config parameters!");
