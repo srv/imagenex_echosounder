@@ -116,32 +116,36 @@ class imagenex_echosounder {
     // Publish filtered measurement
     // Filter zeros
 
-    double diff_ranges = fabs(profundidad - profundidad_anterior) * 100 /profundidad; // in percentage
+    double diff_ranges = (fabs(profundidad - profundidad_anterior) * 100)/(max(profundidad,profundidad_anterior)); // in percentage of the highest value
     // double diff_ranges = fabs(profundidad - profundidad_anterior); // in absolute value in m
     if(sample_counter <= sample_vector_size){ // vector of samples to check if the sensor gets lost (range= 0.00) during a number of samples. 
       sample_vector.push_back(profundidad); 
       sample_counter++;
-    }else{
-      sample_counter=0;
-      average = accumulate( sample_vector.begin(), sample_vector.end(), 0.0) / sample_vector_size; 
+      average = accumulate( sample_vector.begin(), sample_vector.end(), 0.0) / sample_vector_size;
       if (average ==0.00){  // got lost during sample_vector_size sensor samples. All samples = 0.00. 
-        gotlost = true; // this varialbe is set after sample_vector_size samples equal to 0 have been detected.
+        gotlost = true; // this variable is set after sample_vector_size samples equal to 0 have been detected.
         ROS_WARN("Echosounder Got Lost during: %i samples", sample_vector_size);
       }
     }
+    if(sample_counter > sample_vector_size) sample_counter=0;
+      
+    // got lost if 10 consecutive samples =0 
+/* verify the diff_ranges respect the profundidad and profundidad_anterior and why */
 
-
-    if (!gotlost and diff_ranges< range_percentage and profundidad != 0 and profundidad <= profundidad_max and profundidad >= profundidad_min)
+    if (!gotlost and (diff_ranges<range_percentage) and (profundidad != 0) and (profundidad <= profundidad_max) and (profundidad > profundidad_min)) // do not consider altitudes of exactly 0.5 since they are outliers caused when the sensor approximates to its lowest range.
     {
       altitude_filtered_pub_.publish(msg);
       profundidad_anterior=profundidad; // updating the value of this variable only when the message is published 
       //avoids the possibility of having 2 or 3 consecutive outliers, assuming that the vehicle altitude will not change abruptly   
     } // on the other hand, if the sensor gets lost (value ==> 0.00) during a certain period, the new data could be 
       // far from the last stored and valid range, and this will prevent the publication of further range samples.
-    if (gotlost and profundidad != 0 and profundidad <= profundidad_max and profundidad >= profundidad_min) {
+    if (gotlost and (profundidad != 0) and (profundidad <= profundidad_max) and (profundidad >= profundidad_min)) 
+    {
       altitude_filtered_pub_.publish(msg); // publish next range after recovered 
       profundidad_anterior=profundidad; // initialize the value of profundidad_anterior with the last published range
-      }
+      gotlost=false;    
+    }
+    
   } // an initialization proceduce in case of loss is needed to prevent this latter case.
   
   
