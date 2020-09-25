@@ -22,7 +22,8 @@ class imagenex_echosounder {
     ROS_INFO("timeoutSerial: %i", timeoutSerial);
     ROS_INFO("timerDuration: %f", timerDuration);
     ROS_INFO("range percentage: %f", range_percentage);
-
+    ROS_INFO("sample_vector_size: %i", sample_vector_size);
+	
     altitude_raw_pub_ = nhp_.advertise<sensor_msgs::Range>("altitude_raw", 1); 
     altitude_filtered_pub_ = nhp_.advertise<sensor_msgs::Range>("altitude_filtered", 1); 
     serial.open(115200); // open serial port and set it velocity. 
@@ -31,7 +32,7 @@ class imagenex_echosounder {
     timer_ = nh_.createTimer(ros::Duration(timerDuration), // Create a ROS timer with timerDuration.
                              &imagenex_echosounder::timerCallback, 
                              this);
-    profundidad_anterior = 0.0; 
+    //profundidad_anterior = 0.0; 
   	}
 
  private:
@@ -116,7 +117,7 @@ class imagenex_echosounder {
     // Publish filtered measurement
     // Filter zeros
 
-    double diff_ranges = (fabs(profundidad - profundidad_anterior) * 100)/(max(profundidad,profundidad_anterior)); // in percentage of the highest value
+    double diff_ranges = (fabs(profundidad - profundidad_anterior) * 100)/(std::max(profundidad,profundidad_anterior)); // in percentage of the highest value
     // double diff_ranges = fabs(profundidad - profundidad_anterior); // in absolute value in m
     if(sample_counter <= sample_vector_size){ // vector of samples to check if the sensor gets lost (range= 0.00) during a number of samples. 
       sample_vector.push_back(profundidad); 
@@ -135,6 +136,7 @@ class imagenex_echosounder {
     if (!gotlost and (diff_ranges<range_percentage) and (profundidad != 0) and (profundidad <= profundidad_max) and (profundidad > profundidad_min)) // do not consider altitudes of exactly 0.5 since they are outliers caused when the sensor approximates to its lowest range.
     {
       altitude_filtered_pub_.publish(msg);
+      ////ROS_WARN("altitude filtered published");
       profundidad_anterior=profundidad; // updating the value of this variable only when the message is published 
       //avoids the possibility of having 2 or 3 consecutive outliers, assuming that the vehicle altitude will not change abruptly   
     } // on the other hand, if the sensor gets lost (value ==> 0.00) during a certain period, the new data could be 
@@ -147,7 +149,7 @@ class imagenex_echosounder {
     }
     
   } // an initialization proceduce in case of loss is needed to prevent this latter case.
-  
+
   
   // declaration of private variables, buffers, etc.
   ros::NodeHandle nh_;
@@ -190,7 +192,7 @@ class imagenex_echosounder {
     valid_config = valid_config && ros::param::getCached("~timeoutSerial", timeoutSerial);
     valid_config = valid_config && ros::param::getCached("~timerDuration", timerDuration);
     valid_config = valid_config && ros::param::getCached("~range_percentage", range_percentage);
-    valid_config = valid_config && ros::param::getCached("~range_percentage", sample_vector_size);
+    valid_config = valid_config && ros::param::getCached("~sample_vector_size", sample_vector_size);
     // Shutdown if not valid
     if (!valid_config) {
         ROS_FATAL_STREAM("Shutdown due to invalid config parameters!");

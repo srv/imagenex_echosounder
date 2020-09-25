@@ -4,8 +4,7 @@
 # Byte 15 = min range in meters / 10
 # profundidad_maxima ==> //Range: 5,10,20,30,40,50 in meters. Defined in the technical specs of the manufacturer 
 # Start Gain: 0 to 40dB in 1 dB increments,
-# longitud_pulso --> Byte 14 Pulse Length, Length of acoustic transmit pulse. 1-255. 1 to 255 micro sec in 1 micro sec increments. 
-# Greated lenghts for greater distances
+# longitud_pulso --> Byte 14 Pulse Length, Length of acoustic transmit pulse. 1-255. 1 to 255 micro sec in 1 micro sec increments
 # The external trigger must be a 0 to 5 volt TTL pulse with a minimum length of 100 microseconds.
 # Switch Delay: The echo sounder can be commanded to pause (from 0 to 510 msec). Before sending its return data to allow the commanding program enough time to setup for serial reception of the return data.
 # 0 to 255 in 2 msec increments Byte 24 = delay_in_milliseconds/2 . Do not use a value of 253!
@@ -17,13 +16,13 @@
 # if the difference between the current and the previous range represents a percentage over the current range greater than 
 # this value, the new range will not be published. 
 
-imagenex_echosounder/profundidad_maxima: 10.0
+imagenex_echosounder/profundidad_maxima: 10.0 # Range: 5,10,20,30,40,50 in meters
 imagenex_echosounder/profundidad_minima: 0.5
 imagenex_echosounder/ganancia: 14
 imagenex_echosounder/longitud_pulso: 100
 imagenex_echosounder/delay: 2
 imagenex_echosounder/data_points: 25
 imagenex_echosounder/timeoutSerial: 1
-imagenex_echosounder/timerDuration: 0.5
+imagenex_echosounder/timerDuration: 0.2
 imagenex_echosounder/range_percentage: 20
-imagenex_echosounder/sample_vector_size: 20
+imagenex_echosounder/sample_vector_size: 10
