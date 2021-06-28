@@ -22,12 +22,14 @@ class imagenex_echosounder {
     ROS_INFO("profile: %i", profile);
     ROS_INFO("timeoutSerial: %i", timeoutSerial);
     ROS_INFO("timerDuration: %f", timerDuration);
+    ROS_INFO("absorption: %f", absorption);
     ROS_INFO("range percentage: %f", range_percentage);
     ROS_INFO("sample_vector_size: %i", sample_vector_size);
 
     //Publishers
-    altitude_raw_pub_ = nhp_.advertise<sensor_msgs::Range>("altitude_raw", 1); 
-    altitude_filtered_pub_ = nhp_.advertise<sensor_msgs::Range>("altitude_filtered", 1); 
+    profile_range_raw_pub_ = nhp_.advertise<sensor_msgs::Range>("profile_range_raw", 1); 
+    data_bytes_raw_pub_ = nhp_.advertise<sensor_msgs::Range>("data_bytes_raw", 1);
+
     serial.open(115200); 
 	  serial.setTimeout(boost::posix_time::seconds(timeoutSerial)); 
 
@@ -39,10 +41,9 @@ class imagenex_echosounder {
  private:
   void timerCallback(const ros::TimerEvent&) 
   {      
-    // sanity checks according to the technical specifications included in the datasheet. 
     //profile_minimum_range
     if(profile_minimum_range < 0) profile_minimum_range = 0;
-    else if (profile_minimum_range > 25.0) profile_minimum_range = 25.0; 
+    else if (profile_minimum_range > 250) profile_minimum_range = 250; 
 
     //gain        
     if(gain > 40) gain = 40;
@@ -52,6 +53,12 @@ class imagenex_echosounder {
     if (pulse_length >255) pulse_length = 255;
     else if (pulse_length == 253) pulse_length = 254; 
 	  else if (pulse_length < 1) pulse_length = 1;
+
+    //Set the buffer_rx bytes number
+    if (data_points==25 & profile==1) unsigned char buffer_rx[265];
+    else (data_points==50 & profile==1) unsigned char buffer_rx[513];
+
+    unsigned char buffer_tx[27];
       
     // Set the values of the Switch message. The Switch message is the message from computer to Echosounder to pull a range message from the Echosounder. 
     buffer_tx[0] = 0xFE;		        
@@ -64,12 +71,12 @@ class imagenex_echosounder {
     buffer_tx[7] = 0;
     buffer_tx[8] = gain;			
     buffer_tx[9] = 0;
-    buffer_tx[10] = 20;					
+    buffer_tx[10] = absorption;					
     buffer_tx[11] = 0;
     buffer_tx[12] = 0;
     buffer_tx[13] = 0;
     buffer_tx[14] = pulse_length;			
-    buffer_tx[15] = profile_minimum_range/10; 
+    buffer_tx[15] = profile_minimum_range*10;//set the profile_minimum_range in dm
     buffer_tx[16] = 0;
     buffer_tx[17] = 0;
     buffer_tx[18] = 0;					
@@ -92,9 +99,28 @@ class imagenex_echosounder {
 
     profile_range_high_byte = float((buffer_rx[9] & 0x7E) >> 1);
     profile_range_low_byte = float((buffer_rx[9] & 0x01) << 7)|(buffer_rx[8] & 0x7F));
-    profile_range = float((profile_range_high_byte << 8)|profile_range_low_byte);
+    profile_range = 0.01 *float((profile_range_high_byte << 8)|profile_range_low_byte);
+
+    data_bytes_high_byte = float((buffer_rx[11] & 0x7E) >> 1);
+    data_bytes_low_byte = float((buffer_rx[11] & 0x01) << 7)|(buffer_rx[10] & 0x7F));
+    data_bytes = float((data_bytes_high_byte << 8)|data_bytes_low_byte);
+
+
+    // Publish data_bytes raw measurement
+    sensor_msgs::Range msg;
+    msg.header.stamp = ros::Time::now();
+    msg.header.frame_id = "echosounder";
+    msg.radiation_type = sensor_msgs::Range::ULTRASOUND;
+    msg.field_of_view = 0.1745329252; //10 degrees
+    msg.min_range = profile_minimum_range;
+    msg.max_range = range;
+    msg.range = data_bytes;
+    // Filter zeros
+    if(data_bytes >= profile_minimum_range){
+      data_bytes_raw_pub_.publish(msg);
+    }
     
-    // Publish raw measurement
+    // Publish profile_range raw measurement
     sensor_msgs::Range msg;
     msg.header.stamp = ros::Time::now();
     msg.header.frame_id = "echosounder";
@@ -103,44 +129,11 @@ class imagenex_echosounder {
     msg.min_range = profile_minimum_range;
     msg.max_range = range;
     msg.range = profile_range;
-    ROS_INFO("Profunditat max: %f", msg.max_range);
-    ROS_INFO("Profunditat min: %f", msg.min_range);
-    ROS_INFO("Profunditat: %f", msg.range);
-    altitude_raw_pub_.publish(msg);
-
-    // Publish filtered measurement
     // Filter zeros
-
-    double diff_ranges = (fabs(profile_range - old_profile_range) * 100) /profile_range; 
-    if(sample_counter <= sample_vector_size){ // vector of samples to check if the sensor gets lost (range= 0.00) during a number of samples. 
-      sample_vector.push_back(profile_range); 
-      sample_counter++;
-    }else{
-      sample_counter = 0;
-      average = accumulate( sample_vector.begin(), sample_vector.end(), 0.0) / sample_vector_size; 
-      if (average ==0.00){  // got lost during sample_vector_size sensor samples. All samples = 0.00. 
-        gotlost = true; // this varialbe is set after sample_vector_size samples equal to 0 have been detected.
-      }
+    if(profile_range >= profile_minimum_range){
+      profile_range_raw_pub_.publish(msg);
     }
-
-    ROS_INFO("altitude filtered published. Diff ranges: %f, gotlost: %i, profunditat: %f, profunditat anterior %f ", diff_ranges, gotlost, profile_range,old_profile_range);	
-    if (!gotlost and diff_ranges< range_percentage and profile_range != 0 and profile_range <= range and profile_range >= profile_minimum_range)
-    {
-      altitude_filtered_pub_.publish(msg);
-      ////ROS_WARN("altitude filtered published");
-      old_profile_range = profile_range; // updating the value of this variable only when the message is published 
-      //avoids the possibility of having 2 or 3 consecutive outliers, assuming that the vehicle altitude will not change abruptly   
-    } // on the other hand, if the sensor gets lost (value ==> 0.00) during a certain period, the new data could be 
-      // far from the last stored and valid range, and this will prevent the publication of further range samples.
-    if (gotlost and profile_range != 0 and profile_range <= range and profile_range >= profile_minimum_range) {
-      altitude_filtered_pub_.publish(msg); // publish next range after recovered 
-      old_profile_range = profile_range; // initialize the value of profundidad_anterior with the last published range   
-    }
-  old_profile_range = profile_range;
-  } // an initialization proceduce in case of loss is needed to prevent this latter case.
-
   
-  // declaration of private variables, buffers, etc.
   ros::NodeHandle nh_;
   ros::NodeHandle nhp_;
   ros::Publisher altitude_raw_pub_;
@@ -148,24 +141,9 @@ class imagenex_echosounder {
   ros::Timer timer_;
   int64_t seq_;
   TimeoutSerial serial;
-  unsigned char buffer_rx[513];//The total number of bytes returned could be 13, 265 or 513 deppending on data_points and profile parameters
-  unsigned char buffer_tx[27];
-  double profile_minimum_range, profile_range_high_byte, profile_range_low_byte, profile_range, old_profile_range;
-  double range; 
-  int gain; 
-  double absorcion;
-  int long_pulso; 
-  int delay; 
-  int data_points;
-  int profile;
-  int timeoutSerial; 
-  double timerDuration; 
-  double range_percentage;
-  int sample_vector_size;
-  std::vector<double> sample_vector; 
-  int sample_counter=0;
-  double average;
-  bool gotlost = false;
+  double profile_minimum_range, profile_range_high_byte, profile_range_low_byte, profile_range, old_profile_range,range;
+  double data_bytes_high_byte, data_bytes_low_byte, data_bytes,timerDuration;
+  int gain, absorption,long_pulso,delay,data_points,profile,timeoutSerial; 
 
   void getConfig() {
     bool valid_config = true;
@@ -179,8 +157,8 @@ class imagenex_echosounder {
     valid_config = valid_config && ros::param::getCached("~profile", profile);
     valid_config = valid_config && ros::param::getCached("~timeoutSerial", timeoutSerial);
     valid_config = valid_config && ros::param::getCached("~timerDuration", timerDuration);
-    valid_config = valid_config && ros::param::getCached("~range_percentage", range_percentage);
-    valid_config = valid_config && ros::param::getCached("~sample_vector_size", sample_vector_size);
+    valid_config = valid_config && ros::param::getCached("~absorption", absorption);
+
     // Shutdown if not valid
     if (!valid_config) {
         ROS_FATAL_STREAM("Shutdown due to invalid config parameters!");
