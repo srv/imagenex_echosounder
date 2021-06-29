@@ -14,11 +14,12 @@ class imagenex_echosounder {
     // Get configuration from rosparam server
     getConfig();
     ROS_INFO("Profunditat max: %f", profundidad_max);
-	  ROS_INFO("Profunditat min: %f", profundidad_min);
-	  ROS_INFO("ganancia: %i", ganancia);
-	  ROS_INFO("longitud_pulso: %i", long_pulso);
-	  ROS_INFO("delay: %i", delay);
-	  ROS_INFO("data_points: %i", data_points);
+    ROS_INFO("Profunditat min: %f", profundidad_min);
+    ROS_INFO("profile (ON - 1, OFF - 0)): %b", profile);
+    ROS_INFO("ganancia: %i", ganancia);
+    ROS_INFO("longitud_pulso: %i", long_pulso);
+    ROS_INFO("delay: %i", delay);
+    ROS_INFO("data_points: %i", data_points);
     ROS_INFO("timeoutSerial: %i", timeoutSerial);
     ROS_INFO("timerDuration: %f", timerDuration);
     ROS_INFO("range percentage: %f", range_percentage);
@@ -52,7 +53,7 @@ class imagenex_echosounder {
 	// # longitud_pulso --> Byte 14 Pulse Length, Length of acoustic transmit pulse. 1-255. 1 to 255 micro sec in 1 micro sec increments
 
     if (long_pulso >255) long_pulso = 255;
-    else if (long_pulso == 253) long_pulso = 254; // Do not Comment this setting. It is mandatory.
+    else if (long_pulso == 253) long_pulso = 254; // Do not Comment this setting. It is mandatory. 253 = 0xFD, which is the special caracter for the end of the Switch Data Command
 	  else if (long_pulso < 1) long_pulso = 1;
             
     if(delay/2 == 253) delay = 508; 
@@ -77,14 +78,15 @@ class imagenex_echosounder {
     buffer_tx[12] = 0;
     buffer_tx[13] = 0;
     buffer_tx[14] = long_pulso;			//Pulse Length: 100 microseconds
-    buffer_tx[15] = profundidad_min*10; //Minimun Range: 0-25m in 0.1 increments
+   // buffer_tx[15] = profundidad_min*10; //Minimun Range: 0-25m in 0.1 increments
+    buffer_tx[15] = profundidad_min/10; //Minimun Range: 0-25m in 0.1 increments : corrected FBF 29/06/2021
     buffer_tx[16] = 0;
     buffer_tx[17] = 0;
     buffer_tx[18] = 0;					//External Trigger Control
     buffer_tx[19] = data_points;		//Data Points: 25=250 points 'IMX'
     buffer_tx[20] = 0;
     buffer_tx[21] = 0;
-    buffer_tx[22] = 0;					//Profile: 0=OFF, 1=IPX output
+    buffer_tx[22] = profile;					//Profile: 0=OFF, ON=1 --> IPX output. Parametrized by FBF 29/06/2021. By default it was at OFF.
     buffer_tx[23] = 0;
     buffer_tx[24] = delay/2;			//Switch Delay: (delay in milliseconds)/2
     buffer_tx[25] = 0;					//Frequency: 0=675kHz
@@ -97,8 +99,29 @@ class imagenex_echosounder {
     } catch (...)
     {
     }
-	
-    profundidad = 0.01 * float(((buffer_rx[9] & 0x7F) << 7) | (buffer_rx[8] & 0x7F)); 
+
+    /*profile_range_high_byte = float((buffer_rx[9] & 0x7E) >> 1);
+    profile_range_low_byte = float((buffer_rx[9] & 0x01) << 7)|(buffer_rx[8] & 0x7F));
+    profundidad = 0.01 *float((profile_range_high_byte << 8)|profile_range_low_byte);
+
+    data_bytes_high_byte = float((buffer_rx[11] & 0x7E) >> 1);
+    data_bytes_low_byte = float((buffer_rx[11] & 0x01) << 7)|(buffer_rx[10] & 0x7F));
+    data_bytes = float((data_bytes_high_byte << 8)|data_bytes_low_byte);*/
+    ROS_INFO("ASCII M or G ? : %c", buffer_rx[1]);
+   
+    if (buffer_rx[1]=='M' or buffer_rx[1]=='G') 
+    {
+	DataBytes12=static_cast<unsigned int>(buffer_rx[12]);
+	DataBytes13=static_cast<unsigned int>(buffer_rx[13]);
+    	DataBytes14=static_cast<unsigned int>(buffer_rx[14]);
+    	DataBytes15=static_cast<unsigned int>(buffer_rx[15]);
+    	DataBytes16=static_cast<unsigned int>(buffer_rx[16]);
+
+    	ROS_INFO("Data Bytes: %i %i %i %i %i ", DataBytes12, DataBytes13, DataBytes14, DataBytes15, DataBytes16);
+    }
+
+    profundidad = 0.01 * float(((buffer_rx[9] & 0x7F) << 7) | (buffer_rx[8] & 0x7F)); // this decodification is equal to the one specified in the datasheet
+    data_bytes = float(((buffer_rx[11] & 0x7F) << 7) | (buffer_rx[10] & 0x7F)); // this decodification is equal to the one specified in the datasheet
     
     // Publish raw measurement
     sensor_msgs::Range msg;
@@ -112,6 +135,7 @@ class imagenex_echosounder {
     ROS_INFO("Profunditat max: %f", msg.max_range);
     ROS_INFO("Profunditat min: %f", msg.min_range);
     ROS_INFO("Profunditat: %f", msg.range);
+    ROS_INFO("Number of data bytes received: %f", data_bytes);
     altitude_raw_pub_.publish(msg);
 
     // Publish filtered measurement
@@ -122,8 +146,8 @@ class imagenex_echosounder {
     if(sample_counter <= sample_vector_size){ // vector of samples to check if the sensor gets lost (range= 0.00) during a number of samples. 
       sample_vector.push_back(profundidad); 
       sample_counter++;
-      average = accumulate( sample_vector.begin(), sample_vector.end(), 0.0) / sample_vector_size;
-      if (average ==0.00){  // got lost during sample_vector_size sensor samples. All samples = 0.00. 
+      average = accumulate( sample_vector.begin(), sample_vector.end(), 0.0) / sample_vector_size; // computes de mean. 
+      if (average ==0.00){  // got lost during sample_vector_size sensor samples. All samples = 0.00. IMPORTANT: Sample = 0 means that the ecosounder is lost or OUT OF RANGE.  
         gotlost = true; // this variable is set after sample_vector_size samples equal to 0 have been detected.
         ROS_WARN("Echosounder Got Lost during: %i samples", sample_vector_size);
       }
@@ -133,14 +157,17 @@ class imagenex_echosounder {
     // got lost if 10 consecutive samples =0 
 /* verify the diff_ranges respect the profundidad and profundidad_anterior and why */
 
-    if (!gotlost and (diff_ranges<range_percentage) and (profundidad != 0) and (profundidad <= profundidad_max) and (profundidad > profundidad_min)) // do not consider altitudes of exactly 0.5 since they are outliers caused when the sensor approximates to its lowest range.
+    if (!gotlost and (diff_ranges<range_percentage) and (profundidad != 0) and (profundidad <= profundidad_max) and (profundidad > profundidad_min)) 
+// if the echosounder is not lost, and the difference in range between consecutive samples, and "profundidad" fullfills all requirements , publish the "filtered" sample. 
+// IMPORTANT: do not consider altitudes of exactly 0.5 since they are outliers caused when the sensor approximates to its lowest range. DEPTHS LOWER THAN 0.5 ARE NOT RELIABLE. MINIMUM RANGE DETECTABLE = 0.5 M
     {
       altitude_filtered_pub_.publish(msg);
       ////ROS_WARN("altitude filtered published");
       profundidad_anterior=profundidad; // updating the value of this variable only when the message is published 
       //avoids the possibility of having 2 or 3 consecutive outliers, assuming that the vehicle altitude will not change abruptly   
     } // on the other hand, if the sensor gets lost (value ==> 0.00) during a certain period, the new data could be 
-      // far from the last stored and valid range, and this will prevent the publication of further range samples.
+      // far from the last stored and valid range, and this will prevent the publication of further range samples WHEN IT RECOVERS. So, lets publish new range data after the sensor recovers. 
+// how will we know that the sensor has recovered ? it gotlost ("profundidad = 0"), but the "profundidad" is again <> 0 (recovered !!!), and in the range of accepted values. 
     if (gotlost and (profundidad != 0) and (profundidad <= profundidad_max) and (profundidad >= profundidad_min)) 
     {
       altitude_filtered_pub_.publish(msg); // publish next range after recovered 
@@ -161,17 +188,21 @@ class imagenex_echosounder {
   
   TimeoutSerial serial;
   
+  float profile_minimum_range, profile_range_high_byte, profile_range_low_byte, profile_range, old_profile_range,range;
+  float data_bytes_high_byte, data_bytes_low_byte, data_bytes;
   unsigned char buffer_rx[265];
   unsigned char buffer_tx[27];
   double profundidad, profundidad_anterior;
   double profundidad_min;// minimum distance detected by the sensor.
   double profundidad_max; // maximum range: 5, 10, 20
+  bool profile;
   int ganancia; // amplifies the received signal
   double absorcion;
   int long_pulso; // pulse lenght. Greated lenghts for greater distances.
   int delay; 
   int data_points;
   int timeoutSerial; 
+  int DataBytes12, DataBytes13, DataBytes14, DataBytes15, DataBytes16;
   double timerDuration; 
   double range_percentage;
   int sample_vector_size;
@@ -184,6 +215,7 @@ class imagenex_echosounder {
     bool valid_config = true;
 
     valid_config = valid_config && ros::param::getCached("~profundidad_maxima", profundidad_max);
+    valid_config = valid_config && ros::param::getCached("~profile", profile);
     valid_config = valid_config && ros::param::getCached("~profundidad_minima", profundidad_min);
     valid_config = valid_config && ros::param::getCached("~ganancia", ganancia);
     valid_config = valid_config && ros::param::getCached("~longitud_pulso", long_pulso);
