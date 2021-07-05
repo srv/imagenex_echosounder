@@ -13,17 +13,16 @@ class imagenex_echosounder {
 
     // Get configuration from rosparam server
     getConfig();
-    ROS_INFO("Range: %f", range);
     ROS_INFO("Profunditat max: %f", range);
 	  ROS_INFO("Profunditat min: %f", profile_minimum_range);
-    ROS_INFO("profile (ON - 1, OFF - 0)): %i", profile);
+    ROS_INFO("profile (ON - 1, OFF - 0)): %d", profile);
 	  ROS_INFO("gain: %i", gain);
 	  ROS_INFO("pulse_length: %i", pulse_length);
 	  ROS_INFO("delay: %i", delay);
 	  ROS_INFO("data_points: %i", data_points);
     ROS_INFO("timeoutSerial: %i", timeoutSerial);
     ROS_INFO("timerDuration: %f", timerDuration);
-    ROS_INFO("absorption: %f", absorption);
+    ROS_INFO("absorption: %i", absorption);
     ROS_INFO("range percentage: %f", range_percentage);
     ROS_INFO("sample_vector_size: %i", sample_vector_size);
 
@@ -57,13 +56,14 @@ class imagenex_echosounder {
     else if (pulse_length == 253) pulse_length = 254; 
 	  else if (pulse_length < 1) pulse_length = 1;
 
-    //Set the buffer_rx bytes number
-    if (data_points==25 && profile==1) unsigned char buffer_rx[265];
-    else (data_points==50 && profile==1) unsigned char buffer_rx[513]; // be carefull !!! a logical and is: &&
+    // //Set the buffer_rx bytes number
+    // if (data_points==25 && profile==1) unsigned char buffer_rx[265];
+    // else (data_points==50 && profile==1) unsigned char buffer_rx[513]; // be carefull !!! a logical and is: &&
 
     if(delay/2 == 253) delay = 508; // all values equal to 253 have to be filtered out. 253 is reserved for end of frame.
 
     unsigned char buffer_tx[27];
+    unsigned char buffer_rx[513];
       
     // Set the values of the Switch message. The Switch message is the message from computer to Echosounder to pull a range message from the Echosounder. 
     buffer_tx[0] = 0xFE;		        
@@ -131,17 +131,17 @@ class imagenex_echosounder {
 
 
     // Publish data_bytes raw measurement
-    sensor_msgs::Range msg;
-    msg.header.stamp = ros::Time::now();
-    msg.header.frame_id = "echosounder";
-    msg.radiation_type = sensor_msgs::Range::ULTRASOUND;
-    msg.field_of_view = 0.1745329252; //10 degrees
-    msg.min_range = profile_minimum_range;
-    msg.max_range = range;
-    msg.range = data_bytes;
+    sensor_msgs::Range msg_databytes;
+    msg_databytes.header.stamp = ros::Time::now();
+    msg_databytes.header.frame_id = "data_bytes";
+    msg_databytes.radiation_type = sensor_msgs::Range::ULTRASOUND;
+    msg_databytes.field_of_view = 0.1745329252; //10 degrees
+    msg_databytes.min_range = profile_minimum_range;
+    msg_databytes.max_range = range;
+    msg_databytes.range = data_bytes;
     // Filter zeros
     if(profile == 1){
-      data_bytes_raw_pub_.publish(msg);
+      data_bytes_raw_pub_.publish(msg_databytes);
     }
     
     // Publish profile_range raw measurement
@@ -157,13 +157,13 @@ class imagenex_echosounder {
     if(profile_range >= profile_minimum_range){
       profile_range_raw_pub_.publish(msg);
     }
-    else{ROS_WARN("profile range not published, it is lower than profile minimum range: %i");}
+    else{ROS_WARN("profile range not published: %f, it is lower than profile minimum range: %f",profile_range, profile_minimum_range);} //sanity check
   
   double diff_ranges = (fabs(profile_range - previous_profile_range) * 100)/(std::max(profile_range,previous_profile_range)); // in percentage of the highest value
 
 
   if(sample_counter <= sample_vector_size){ // vector of samples to check if the sensor gets lost (range= 0.00) during a number of samples. 
-      sample_vector.push_back(depth); 
+      sample_vector.push_back(profile_range); 
       sample_counter++;
       average = accumulate( sample_vector.begin(), sample_vector.end(), 0.0) / sample_vector_size; // computes de mean. 
       if (average ==0.00){  // got lost during sample_vector_size sensor samples. All samples = 0.00. IMPORTANT: Sample = 0 means that the ecosounder is lost or OUT OF RANGE.  
@@ -204,10 +204,10 @@ class imagenex_echosounder {
   ros::NodeHandle nhp_;
   ros::Publisher profile_range_raw_pub_;
   ros::Publisher profile_range_filtered_pub_;
+  ros::Publisher data_bytes_raw_pub_;
   ros::Timer timer_;
   int64_t seq_;
   TimeoutSerial serial;
-  double depth, previous_depth;
   double profile_minimum_range, profile_range_high_byte, profile_range_low_byte, profile_range, old_profile_range,range, previous_profile_range;
   double data_bytes_high_byte, data_bytes_low_byte, data_bytes,timerDuration;
   int gain, absorption,long_pulso,delay,data_points,profile,timeoutSerial; 
@@ -216,7 +216,7 @@ class imagenex_echosounder {
   int sample_counter=0;
   double average, range_percentage; 
   bool gotlost = false;
-  int sample_vector_size;
+  int sample_vector_size, pulse_length;
 
 
 
