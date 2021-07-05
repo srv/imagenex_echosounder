@@ -17,14 +17,16 @@
 # this value, the new range will not be published. 
 
 imagenex_echosounder/range: 10.0 # Range: 5,10,20,30,40,50 in meters
-imagenex_echosounder/profile_minimum_range: 1 #profile_minimum_range in meters
+imagenex_echosounder/profile_minimum_range: 1 #profile_minimum_range in meters # 0 - 250 / 10
 imagenex_echosounder/gain: 14
 imagenex_echosounder/pulse_length: 100
-imagenex_echosounder/delay: 100
-imagenex_echosounder/data_points: 50
+imagenex_echosounder/delay: 2
+imagenex_echosounder/data_points: 25
 imagenex_echosounder/profile: 1
 imagenex_echosounder/absorption: 20
 imagenex_echosounder/timeoutSerial: 1
-imagenex_echosounder/timerDuration: 0.4
+imagenex_echosounder/timerDuration: 0.2
+magenex_echosounder/range_percentage: 20
+imagenex_echosounder/sample_vector_size: 10
 
 
