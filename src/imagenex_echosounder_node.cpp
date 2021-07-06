@@ -25,6 +25,7 @@ class imagenex_echosounder {
     ROS_INFO("absorption: %i", absorption);
     ROS_INFO("range percentage: %f", range_percentage);
     ROS_INFO("sample_vector_size: %i", sample_vector_size);
+    ROS_INFO("dev_name: %s", devname);
 
 
     //Publishers
@@ -32,7 +33,7 @@ class imagenex_echosounder {
     data_bytes_raw_pub_ = nhp_.advertise<sensor_msgs::Range>("data_bytes_raw", 1);
     profile_range_filtered_pub_ = nhp_.advertise<sensor_msgs::Range>("profile_range_filtered", 1); 
 
-    serial.open(115200); 
+    serial.open(devname,115200); // open serial port and set it velocity.    
 	  serial.setTimeout(boost::posix_time::seconds(timeoutSerial)); 
 
     timer_ = nh_.createTimer(ros::Duration(timerDuration), 
@@ -206,8 +207,10 @@ class imagenex_echosounder {
   ros::Publisher profile_range_filtered_pub_;
   ros::Publisher data_bytes_raw_pub_;
   ros::Timer timer_;
-  int64_t seq_;
+  std::string devname;
   TimeoutSerial serial;
+  
+  int64_t seq_;
   double profile_minimum_range, profile_range_high_byte, profile_range_low_byte, profile_range, old_profile_range,range, previous_profile_range;
   double data_bytes_high_byte, data_bytes_low_byte, data_bytes,timerDuration;
   int gain, absorption,long_pulso,delay,data_points,profile,timeoutSerial; 
@@ -235,7 +238,7 @@ class imagenex_echosounder {
     valid_config = valid_config && ros::param::getCached("~absorption", absorption);
     valid_config = valid_config && ros::param::getCached("~range_percentage", range_percentage);
     valid_config = valid_config && ros::param::getCached("~sample_vector_size", sample_vector_size);
-
+    valid_config = valid_config && ros::param::getCached("~devname", devname);
     // Shutdown if not valid
     if (!valid_config) {
         ROS_FATAL_STREAM("Shutdown due to invalid config parameters!");
