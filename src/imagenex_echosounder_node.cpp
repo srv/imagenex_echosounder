@@ -25,7 +25,7 @@ class imagenex_echosounder {
     ROS_INFO("absorption: %i", absorption);
     ROS_INFO("range percentage: %f", range_percentage);
     ROS_INFO("sample_vector_size: %i", sample_vector_size);
-    ROS_INFO("dev_name: %s", devname);
+    ROS_INFO("devname: %s", devname.c_str());
 
 
     //Publishers
@@ -99,14 +99,13 @@ class imagenex_echosounder {
     serial.write(reinterpret_cast<char*>(buffer_tx), sizeof(buffer_tx)); // write the Switch message in the serial port
     try {
       serial.read(reinterpret_cast<char*>(buffer_rx), sizeof(buffer_rx)); // read the data buffer received in the serial port
-    } catch (...)
-    {
+    } catch (const std::exception &exc){
+      std::cerr <<"EXCEPTIOOOOOOON "<< exc.what()<<std::endl;
     }
 
     /*profile_range_high_byte = float((buffer_rx[9] & 0x7E) >> 1);
     profile_range_low_byte = float((buffer_rx[9] & 0x01) << 7)|(buffer_rx[8] & 0x7F));
     profile_range = 0.01 *float((profile_range_high_byte << 8)|profile_range_low_byte);
-
     data_bytes_high_byte = float((buffer_rx[11] & 0x7E) >> 1);
     data_bytes_low_byte = float((buffer_rx[11] & 0x01) << 7)|(buffer_rx[10] & 0x7F));
     data_bytes = float((data_bytes_high_byte << 8)|data_bytes_low_byte);*/
@@ -129,6 +128,8 @@ class imagenex_echosounder {
     profile_range = 0.01 * float(((buffer_rx[9] & 0x7F) << 7) | (buffer_rx[8] & 0x7F)); // this decodification is equal to the one specified in the datasheet
     data_bytes = float(((buffer_rx[11] & 0x7F) << 7) | (buffer_rx[10] & 0x7F)); // this decodification is equal to the one specified in the datasheet
     
+    ROS_INFO(" profile_range: %f",profile_range);
+    ROS_INFO(" data_bytes: %f",data_bytes);
 
 
     // Publish data_bytes raw measurement
