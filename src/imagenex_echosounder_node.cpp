@@ -42,8 +42,8 @@ class imagenex_echosounder {
   	}
 
  private:
-  void timerCallback(const ros::TimerEvent&) 
-  {      
+  // void timerCallback(const ros::TimerEvent&) 
+  while (ros::ok()){      
     //profile_minimum_range
     if(profile_minimum_range < 0) profile_minimum_range = 0;
     else if (profile_minimum_range > 25.0) profile_minimum_range = 25.0; 
@@ -215,7 +215,8 @@ class imagenex_echosounder {
       previous_profile_range=profile_range; // initialize the value of profundidad_anterior with the last published range
       gotlost=false;    
     }
-    
+
+  ros::Duration(loop_time_step).sleep();  
   } // an initialization proceduce in case of loss is needed to prevent this latter case.
 
   
@@ -240,7 +241,7 @@ class imagenex_echosounder {
   int sample_counter=0;
   double average, range_percentage; 
   bool gotlost = false;
-  int sample_vector_size, pulse_length;
+  int sample_vector_size, pulse_length,loop_time_step;
 
 
 
@@ -260,6 +261,7 @@ class imagenex_echosounder {
     valid_config = valid_config && ros::param::getCached("~range_percentage", range_percentage);
     valid_config = valid_config && ros::param::getCached("~sample_vector_size", sample_vector_size);
     valid_config = valid_config && ros::param::getCached("~devname", devname);
+    valid_config = valid_config && ros::param::getCached("~loop_time_step", loop_time_step);
     // Shutdown if not valid
     if (!valid_config) {
         ROS_FATAL_STREAM("Shutdown due to invalid config parameters!");
