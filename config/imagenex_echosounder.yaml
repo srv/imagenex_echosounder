@@ -43,9 +43,6 @@ imagenex_echosounder:
   range_percentage: 20
   sample_vector_size: 20
   devname: "/dev/serial/by-id/usb-FTDI_Chipi-X_FT5ADULG-if00-port0"
-  # devname: "/dev/serial/by-id/usb-FTDI_UT232R_FT2D3911-if00-port0"
-
-
 
 imagenex_echosounder_2:
   range: 5.0 # Range: 5,10,20,30,40,50 in meters

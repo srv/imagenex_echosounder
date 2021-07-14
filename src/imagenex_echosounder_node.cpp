@@ -89,7 +89,7 @@ class imagenex_echosounder {
     buffer_tx[19] = data_points;		
     buffer_tx[20] = 0;
     buffer_tx[21] = 0;
-    buffer_tx[22] = profile;					
+    buffer_tx[22] = profile;					//Profile: 0=OFF, ON=1 --> IPX output. Parametrized by FBF 29/06/2021. By default it was at OFF.
     buffer_tx[23] = 0;
     buffer_tx[24] = delay/2;			
     buffer_tx[25] = 0;					
@@ -125,7 +125,27 @@ class imagenex_echosounder {
       ROS_INFO("Data Bytes: %i %i %i %i %i ", DataBytes12, DataBytes13, DataBytes14, DataBytes15, DataBytes16);
     }
 
-    profile_range = 0.01 * float(((buffer_rx[9] & 0x7F) << 7) | (buffer_rx[8] & 0x7F)); // this decodification is equal to the one specified in the datasheet
+    /*profile_range_high_byte = float((buffer_rx[9] & 0x7E) >> 1);
+    profile_range_low_byte = float((buffer_rx[9] & 0x01) << 7)|(buffer_rx[8] & 0x7F));
+    profundidad = 0.01 *float((profile_range_high_byte << 8)|profile_range_low_byte);
+
+    data_bytes_high_byte = float((buffer_rx[11] & 0x7E) >> 1);
+    data_bytes_low_byte = float((buffer_rx[11] & 0x01) << 7)|(buffer_rx[10] & 0x7F));
+    data_bytes = float((data_bytes_high_byte << 8)|data_bytes_low_byte);*/
+    ROS_INFO("ASCII M or G ? : %c", buffer_rx[1]);
+   
+    if (buffer_rx[1]=='M' or buffer_rx[1]=='G') 
+    {
+      DataBytes12=static_cast<unsigned int>(buffer_rx[12]);
+      DataBytes13=static_cast<unsigned int>(buffer_rx[13]);
+    	DataBytes14=static_cast<unsigned int>(buffer_rx[14]);
+    	DataBytes15=static_cast<unsigned int>(buffer_rx[15]);
+    	DataBytes16=static_cast<unsigned int>(buffer_rx[16]);
+
+    	ROS_INFO("Data Bytes: %i %i %i %i %i ", DataBytes12, DataBytes13, DataBytes14, DataBytes15, DataBytes16);
+    }
+
+    profundidad = 0.01 * float(((buffer_rx[9] & 0x7F) << 7) | (buffer_rx[8] & 0x7F)); // this decodification is equal to the one specified in the datasheet
     data_bytes = float(((buffer_rx[11] & 0x7F) << 7) | (buffer_rx[10] & 0x7F)); // this decodification is equal to the one specified in the datasheet
     
     ROS_INFO(" profile_range: %f",profile_range);
