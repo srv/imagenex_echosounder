@@ -96,7 +96,7 @@ class imagenex_echosounder {
     buffer_tx[26] = 0xFD;				
     
     
-    serial.write(reinterpreunlesst_cast<char*>(buffer_tx), sizeof(buffer_tx)); // write the Switch message in the serial port
+    serial.write(reinterpret_cast<char*>(buffer_tx), sizeof(buffer_tx)); // write the Switch message in the serial port
     try {
       serial.read(reinterpret_cast<char*>(buffer_rx), sizeof(buffer_rx)); // read the data buffer received in the serial port
       ROS_INFO("NO EXCEPTION :)");
