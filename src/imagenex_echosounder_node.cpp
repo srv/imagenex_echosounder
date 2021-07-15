@@ -1,6 +1,7 @@
 #include <iostream>
 #include "ros/ros.h"
 #include "sensor_msgs/Range.h"
+#include "std_msgs/UInt8MultiArray.h"
 #include "TimeoutSerial.h"
 #include <numeric>      // std::accumulate
 
@@ -32,6 +33,7 @@ class imagenex_echosounder {
     profile_range_raw_pub_ = nhp_.advertise<sensor_msgs::Range>("profile_range_raw", 1); 
     data_bytes_raw_pub_ = nhp_.advertise<sensor_msgs::Range>("data_bytes_raw", 1);
     profile_range_filtered_pub_ = nhp_.advertise<sensor_msgs::Range>("profile_range_filtered", 1); 
+    profile_rx_raw = nhp_.advertise<std_msgs::UInt8MultiArray>("profile_rx_raw", 1); 
 
     serial.open(devname,115200); // open serial port and set it velocity.    
 	  serial.setTimeout(boost::posix_time::seconds(timeoutSerial)); 
@@ -65,7 +67,8 @@ class imagenex_echosounder {
 
     unsigned char buffer_tx[27];
     unsigned char buffer_rx[513];
-      
+    std_msgs::UInt8MultiArray rx_arr;
+    
     // Set the values of the Switch message. The Switch message is the message from computer to Echosounder to pull a range message from the Echosounder. 
     buffer_tx[0] = 0xFE;		        
     buffer_tx[1] = 0x44;			    
@@ -99,9 +102,16 @@ class imagenex_echosounder {
     serial.write(reinterpret_cast<char*>(buffer_tx), sizeof(buffer_tx)); // write the Switch message in the serial port
     try {
       serial.read(reinterpret_cast<char*>(buffer_rx), sizeof(buffer_rx)); // read the data buffer received in the serial port
+      ROS_INFO("NO EXCEPTION :)");
     } catch (const std::exception &exc){
+      ROS_WARN("EXCEPTIOOOOOOOOOON");
       std::cerr <<"EXCEPTIOOOOOOON "<< exc.what()<<std::endl;
     }
+
+    for (int i=0; i<=513;i++){
+      rx_arr.data.push_back(buffer_rx[i]);
+    }
+    profile_rx_raw.publish(rx_arr);
 
     /*profile_range_high_byte = float((buffer_rx[9] & 0x7E) >> 1);
     profile_range_low_byte = float((buffer_rx[9] & 0x01) << 7)|(buffer_rx[8] & 0x7F));
@@ -109,8 +119,6 @@ class imagenex_echosounder {
     data_bytes_high_byte = float((buffer_rx[11] & 0x7E) >> 1);
     data_bytes_low_byte = float((buffer_rx[11] & 0x01) << 7)|(buffer_rx[10] & 0x7F));
     data_bytes = float((data_bytes_high_byte << 8)|data_bytes_low_byte);*/
-
-
 
     ROS_INFO("ASCII M or G ? : %c", buffer_rx[1]);
    
@@ -122,7 +130,13 @@ class imagenex_echosounder {
       DataBytes15=static_cast<unsigned int>(buffer_rx[15]);
       DataBytes16=static_cast<unsigned int>(buffer_rx[16]);
 
+      DataBytes17=static_cast<unsigned int>(buffer_rx[17]);
+      DataBytes18=static_cast<unsigned int>(buffer_rx[18]);
+      DataBytes19=static_cast<unsigned int>(buffer_rx[19]);
+      DataBytes20=static_cast<unsigned int>(buffer_rx[20]);
+
       ROS_INFO("Data Bytes: %i %i %i %i %i ", DataBytes12, DataBytes13, DataBytes14, DataBytes15, DataBytes16);
+      ROS_INFO("Data Bytes: %i %i %i %i %i ", DataBytes17, DataBytes18, DataBytes19, DataBytes20, DataBytes21);
     }
 
     /*profile_range_high_byte = float((buffer_rx[9] & 0x7E) >> 1);
@@ -132,20 +146,8 @@ class imagenex_echosounder {
     data_bytes_high_byte = float((buffer_rx[11] & 0x7E) >> 1);
     data_bytes_low_byte = float((buffer_rx[11] & 0x01) << 7)|(buffer_rx[10] & 0x7F));
     data_bytes = float((data_bytes_high_byte << 8)|data_bytes_low_byte);*/
-    ROS_INFO("ASCII M or G ? : %c", buffer_rx[1]);
-   
-    if (buffer_rx[1]=='M' or buffer_rx[1]=='G') 
-    {
-      DataBytes12=static_cast<unsigned int>(buffer_rx[12]);
-      DataBytes13=static_cast<unsigned int>(buffer_rx[13]);
-    	DataBytes14=static_cast<unsigned int>(buffer_rx[14]);
-    	DataBytes15=static_cast<unsigned int>(buffer_rx[15]);
-    	DataBytes16=static_cast<unsigned int>(buffer_rx[16]);
 
-    	ROS_INFO("Data Bytes: %i %i %i %i %i ", DataBytes12, DataBytes13, DataBytes14, DataBytes15, DataBytes16);
-    }
-
-    profundidad = 0.01 * float(((buffer_rx[9] & 0x7F) << 7) | (buffer_rx[8] & 0x7F)); // this decodification is equal to the one specified in the datasheet
+    profile_range = 0.01 * float(((buffer_rx[9] & 0x7F) << 7) | (buffer_rx[8] & 0x7F)); // this decodification is equal to the one specified in the datasheet
     data_bytes = float(((buffer_rx[11] & 0x7F) << 7) | (buffer_rx[10] & 0x7F)); // this decodification is equal to the one specified in the datasheet
     
     ROS_INFO(" profile_range: %f",profile_range);
@@ -228,6 +230,7 @@ class imagenex_echosounder {
   ros::Publisher profile_range_raw_pub_;
   ros::Publisher profile_range_filtered_pub_;
   ros::Publisher data_bytes_raw_pub_;
+  ros::Publisher profile_rx_raw;
   ros::Timer timer_;
   std::string devname;
   TimeoutSerial serial;
@@ -237,6 +240,7 @@ class imagenex_echosounder {
   double data_bytes_high_byte, data_bytes_low_byte, data_bytes,timerDuration;
   int gain, absorption,long_pulso,delay,data_points,profile,timeoutSerial; 
   int DataBytes12, DataBytes13, DataBytes14, DataBytes15, DataBytes16;
+  int DataBytes17, DataBytes18, DataBytes19, DataBytes20, DataBytes21;
   std::vector<double> sample_vector; 
   int sample_counter=0;
   double average, range_percentage; 
