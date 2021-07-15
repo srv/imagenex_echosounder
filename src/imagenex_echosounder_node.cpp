@@ -55,15 +55,15 @@ class imagenex_echosounder {
   ros::Publisher data_bytes_raw_pub_;
   ros::Publisher profile_rx_raw;
   ros::Timer timer_;
-  std::string devname;
   TimeoutSerial serial;
   
   int64_t seq_;
   double profile_minimum_range, profile_range_high_byte, profile_range_low_byte, profile_range, old_profile_range,range, previous_profile_range;
-  double data_bytes_high_byte, data_bytes_low_byte, data_bytes, timerDuration, idle_time;
+  double data_bytes_high_byte, data_bytes_low_byte, data_bytes, timerDuration, idle_time, fov;
   int gain, absorption,long_pulso,delay,data_points,profile,timeoutSerial; 
   int DataBytes12, DataBytes13, DataBytes14, DataBytes15, DataBytes16;
   int DataBytes17, DataBytes18, DataBytes19, DataBytes20, DataBytes21;
+  std::string devname, frame_id;
   std::vector<double> sample_vector; 
   int sample_counter=0;
   double average, range_percentage; 
@@ -218,9 +218,9 @@ class imagenex_echosounder {
     // Publish range raw
     sensor_msgs::Range msg;
     msg.header.stamp = ros::Time::now();
-    msg.header.frame_id = "echosounder";
+    msg.header.frame_id = frame_id;
     msg.radiation_type = sensor_msgs::Range::ULTRASOUND;
-    msg.field_of_view = 0.1745329252; //10 degrees
+    msg.field_of_view = fov; //10 degrees
     msg.min_range = profile_minimum_range;
     msg.max_range = range;
     msg.range = profile_range;
@@ -260,6 +260,8 @@ class imagenex_echosounder {
     valid_config = valid_config && ros::param::getCached("~sample_vector_size", sample_vector_size);
     valid_config = valid_config && ros::param::getCached("~devname", devname);
     valid_config = valid_config && ros::param::getCached("~idle_time", idle_time);
+    valid_config = valid_config && ros::param::getCached("~frame_id", frame_id);
+    valid_config = valid_config && ros::param::getCached("~fov", fov);
     // Shutdown if not valid
     if (!valid_config) {
         ROS_FATAL_STREAM("Shutdown due to invalid config parameters!");

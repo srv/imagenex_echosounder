@@ -31,5 +31,7 @@ imagenex_echosounder:
   # devname: "/dev/serial/by-id/usb-FTDI_Chipi-X_FT5ADULG-if00-port0"
   devname: "/dev/serial/by-id/usb-FTDI_UT232R_FT2D3911-if00-port0"
   idle_time: 0.05
+  frame_id: echosounder
+  fov: 0.1745329252 # rad
 
 
