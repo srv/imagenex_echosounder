@@ -96,10 +96,12 @@ class imagenex_echosounder {
     buffer_tx[26] = 0xFD;				
     
     
-    serial.write(reinterpret_cast<char*>(buffer_tx), sizeof(buffer_tx)); // write the Switch message in the serial port
+    serial.write(reinterpreunlesst_cast<char*>(buffer_tx), sizeof(buffer_tx)); // write the Switch message in the serial port
     try {
       serial.read(reinterpret_cast<char*>(buffer_rx), sizeof(buffer_rx)); // read the data buffer received in the serial port
+      ROS_INFO("NO EXCEPTION :)");
     } catch (const std::exception &exc){
+      ROS_WARN("EXCEPTIOOOOOOOOOON");
       std::cerr <<"EXCEPTIOOOOOOON "<< exc.what()<<std::endl;
     }
 
@@ -109,8 +111,6 @@ class imagenex_echosounder {
     data_bytes_high_byte = float((buffer_rx[11] & 0x7E) >> 1);
     data_bytes_low_byte = float((buffer_rx[11] & 0x01) << 7)|(buffer_rx[10] & 0x7F));
     data_bytes = float((data_bytes_high_byte << 8)|data_bytes_low_byte);*/
-
-
 
     ROS_INFO("ASCII M or G ? : %c", buffer_rx[1]);
    
@@ -122,7 +122,13 @@ class imagenex_echosounder {
       DataBytes15=static_cast<unsigned int>(buffer_rx[15]);
       DataBytes16=static_cast<unsigned int>(buffer_rx[16]);
 
+      DataBytes17=static_cast<unsigned int>(buffer_rx[17]);
+      DataBytes18=static_cast<unsigned int>(buffer_rx[18]);
+      DataBytes19=static_cast<unsigned int>(buffer_rx[19]);
+      DataBytes20=static_cast<unsigned int>(buffer_rx[20]);
+
       ROS_INFO("Data Bytes: %i %i %i %i %i ", DataBytes12, DataBytes13, DataBytes14, DataBytes15, DataBytes16);
+      ROS_INFO("Data Bytes: %i %i %i %i %i ", DataBytes17, DataBytes18, DataBytes19, DataBytes20, DataBytes21);
     }
 
     /*profile_range_high_byte = float((buffer_rx[9] & 0x7E) >> 1);
@@ -132,20 +138,8 @@ class imagenex_echosounder {
     data_bytes_high_byte = float((buffer_rx[11] & 0x7E) >> 1);
     data_bytes_low_byte = float((buffer_rx[11] & 0x01) << 7)|(buffer_rx[10] & 0x7F));
     data_bytes = float((data_bytes_high_byte << 8)|data_bytes_low_byte);*/
-    ROS_INFO("ASCII M or G ? : %c", buffer_rx[1]);
-   
-    if (buffer_rx[1]=='M' or buffer_rx[1]=='G') 
-    {
-      DataBytes12=static_cast<unsigned int>(buffer_rx[12]);
-      DataBytes13=static_cast<unsigned int>(buffer_rx[13]);
-    	DataBytes14=static_cast<unsigned int>(buffer_rx[14]);
-    	DataBytes15=static_cast<unsigned int>(buffer_rx[15]);
-    	DataBytes16=static_cast<unsigned int>(buffer_rx[16]);
 
-    	ROS_INFO("Data Bytes: %i %i %i %i %i ", DataBytes12, DataBytes13, DataBytes14, DataBytes15, DataBytes16);
-    }
-
-    profundidad = 0.01 * float(((buffer_rx[9] & 0x7F) << 7) | (buffer_rx[8] & 0x7F)); // this decodification is equal to the one specified in the datasheet
+    profile_range = 0.01 * float(((buffer_rx[9] & 0x7F) << 7) | (buffer_rx[8] & 0x7F)); // this decodification is equal to the one specified in the datasheet
     data_bytes = float(((buffer_rx[11] & 0x7F) << 7) | (buffer_rx[10] & 0x7F)); // this decodification is equal to the one specified in the datasheet
     
     ROS_INFO(" profile_range: %f",profile_range);
@@ -236,6 +230,7 @@ class imagenex_echosounder {
   double data_bytes_high_byte, data_bytes_low_byte, data_bytes,timerDuration;
   int gain, absorption,long_pulso,delay,data_points,profile,timeoutSerial; 
   int DataBytes12, DataBytes13, DataBytes14, DataBytes15, DataBytes16;
+  int DataBytes17, DataBytes18, DataBytes19, DataBytes20, DataBytes21;
   std::vector<double> sample_vector; 
   int sample_counter=0;
   double average, range_percentage; 
