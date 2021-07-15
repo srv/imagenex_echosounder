@@ -17,19 +17,19 @@
 # this value, the new range will not be published. 
 
 imagenex_echosounder:
-  range: 5.0 # Range: 5,10,20,30,40,50 in meters
-  profile_minimum_range: 0.5
-  gain: 14
-  pulse_length: 100
-  delay: 2
-  data_points: 50
-  profile: 0
-  absorption: 20
+  range: 5.0 # Range: 5,10,20,30,40 or 50 in meters
+  profile_minimum_range: 0.1 # 0 to 25 meters in 0.1 meter increments
+  gain: 14 # (0-40)
+  pulse_length: 100 # (1-255)
+  delay: 2 # (0-510ms)
+  data_points: 50 # (25 or 50)
+  profile: 0 # (ON - 1, OFF - 0)
+  absorption: 20 # TODO Remove, fixed to 20
   timeoutSerial: 1
-  timerDuration: 0.2
   range_percentage: 20
   sample_vector_size: 20
   # devname: "/dev/serial/by-id/usb-FTDI_Chipi-X_FT5ADULG-if00-port0"
   devname: "/dev/serial/by-id/usb-FTDI_UT232R_FT2D3911-if00-port0"
+  idle_time: 0.05
 
 
