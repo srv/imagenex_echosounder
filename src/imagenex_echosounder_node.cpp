@@ -1,6 +1,7 @@
 #include <iostream>
 #include "ros/ros.h"
 #include "sensor_msgs/Range.h"
+#include "std_msgs/UInt8MultiArray.h"
 #include "TimeoutSerial.h"
 #include <numeric>      // std::accumulate
 
@@ -32,6 +33,7 @@ class imagenex_echosounder {
     profile_range_raw_pub_ = nhp_.advertise<sensor_msgs::Range>("profile_range_raw", 1); 
     data_bytes_raw_pub_ = nhp_.advertise<sensor_msgs::Range>("data_bytes_raw", 1);
     profile_range_filtered_pub_ = nhp_.advertise<sensor_msgs::Range>("profile_range_filtered", 1); 
+    profile_rx_raw = nhp_.advertise<std_msgs::UInt8MultiArray>("profile_rx_raw", 1); 
 
     serial.open(devname,115200); // open serial port and set it velocity.    
 	  serial.setTimeout(boost::posix_time::seconds(timeoutSerial)); 
@@ -65,7 +67,8 @@ class imagenex_echosounder {
 
     unsigned char buffer_tx[27];
     unsigned char buffer_rx[513];
-      
+    std_msgs::UInt8MultiArray rx_arr;
+    
     // Set the values of the Switch message. The Switch message is the message from computer to Echosounder to pull a range message from the Echosounder. 
     buffer_tx[0] = 0xFE;		        
     buffer_tx[1] = 0x44;			    
@@ -104,6 +107,11 @@ class imagenex_echosounder {
       ROS_WARN("EXCEPTIOOOOOOOOOON");
       std::cerr <<"EXCEPTIOOOOOOON "<< exc.what()<<std::endl;
     }
+
+    for (int i=0; i<=513;i++){
+      rx_arr.data.push_back(buffer_rx[i]);
+    }
+    profile_rx_raw.publish(rx_arr);
 
     /*profile_range_high_byte = float((buffer_rx[9] & 0x7E) >> 1);
     profile_range_low_byte = float((buffer_rx[9] & 0x01) << 7)|(buffer_rx[8] & 0x7F));
@@ -221,6 +229,7 @@ class imagenex_echosounder {
   ros::Publisher profile_range_raw_pub_;
   ros::Publisher profile_range_filtered_pub_;
   ros::Publisher data_bytes_raw_pub_;
+  ros::Publisher profile_rx_raw;
   ros::Timer timer_;
   std::string devname;
   TimeoutSerial serial;
