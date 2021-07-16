@@ -14,7 +14,7 @@ class imagenex_echosounder {
 
     // Get configuration from rosparam server
     getConfig();
-    ROS_INFO("Profunditat max: %f", range);
+    ROS_INFO("Profunditat max: %f", profile_maximum_range);
 	  ROS_INFO("Profunditat min: %f", profile_minimum_range);
     ROS_INFO("profile (ON - 1, OFF - 0)): %d", profile);
 	  ROS_INFO("gain: %i", gain);
@@ -58,7 +58,7 @@ class imagenex_echosounder {
   TimeoutSerial serial;
   
   int64_t seq_;
-  double profile_minimum_range, profile_range_high_byte, profile_range_low_byte, profile_range, old_profile_range,range, previous_profile_range;
+  double profile_minimum_range, profile_maximum_range, profile_range_high_byte, profile_range_low_byte, profile_range, old_profile_range,range, previous_profile_range;
   double data_bytes_high_byte, data_bytes_low_byte, data_bytes, timerDuration, idle_time, fov;
   int gain, absorption,long_pulso,delay,data_points,profile,timeoutSerial; 
   int DataBytes12, DataBytes13, DataBytes14, DataBytes15, DataBytes16;
@@ -95,7 +95,7 @@ class imagenex_echosounder {
     buffer_tx[0] = 0xFE;		        
     buffer_tx[1] = 0x44;			    
     buffer_tx[2] = 0x11;	    		
-    buffer_tx[3] = range;		
+    buffer_tx[3] = profile_maximum_range;		
     buffer_tx[4] = 0;
     buffer_tx[5] = 0;
     buffer_tx[6] = 0x43;				
@@ -170,7 +170,7 @@ class imagenex_echosounder {
     msg.radiation_type = sensor_msgs::Range::ULTRASOUND;
     msg.field_of_view = 0.1745329252; //10 degrees
     msg.min_range = profile_minimum_range;
-    msg.max_range = range;
+    msg.max_range = profile_maximum_range;
     msg.range = profile_range;
     
     // TODO: review code and clean comments, move publisher to publish()
@@ -191,7 +191,7 @@ class imagenex_echosounder {
 
     // if the echosounder is not lost, and the difference in range between consecutive samples, and "profundidad" fullfills all requirements , publish the "filtered" sample. 
     // IMPORTANT: do not consider altitudes of exactly 0.5 since they are outliers caused when the sensor approximates to its lowest range. DEPTHS LOWER THAN 0.5 ARE NOT RELIABLE. MINIMUM RANGE DETECTABLE = 0.5 M
-    if (!gotlost and (diff_ranges<range_percentage) and (profile_range != 0) and (profile_range <= range) and (profile_range > profile_minimum_range)) {
+    if (!gotlost and (diff_ranges<range_percentage) and (profile_range != 0) and (profile_range <= profile_maximum_range) and (profile_range > profile_minimum_range)) {
       profile_range_filtered_pub_.publish(msg);
       ////ROS_WARN("altitude filtered published");
       previous_profile_range=profile_range; // updating the value of this variable only when the message is published 
@@ -200,7 +200,7 @@ class imagenex_echosounder {
     // on the other hand, if the sensor gets lost (value ==> 0.00) during a certain period, the new data could be 
     // far from the last stored and valid range, and this will prevent the publication of further range samples WHEN IT RECOVERS. So, lets publish new range data after the sensor recovers. 
     // how will we know that the sensor has recovered ? it gotlost ("profundidad = 0"), but the "profundidad" is again <> 0 (recovered !!!), and in the range of accepted values. 
-    if (gotlost and (profile_range != 0) and (profile_range <= range) and (profile_range >= profile_minimum_range)) {
+    if (gotlost and (profile_range != 0) and (profile_range <= profile_maximum_range) and (profile_range >= profile_minimum_range)) {
       profile_range_filtered_pub_.publish(msg); // publish next range after recovered 
       previous_profile_range=profile_range; // initialize the value of profundidad_anterior with the last published range
       gotlost=false;    
@@ -222,7 +222,7 @@ class imagenex_echosounder {
     msg.radiation_type = sensor_msgs::Range::ULTRASOUND;
     msg.field_of_view = fov; //10 degrees
     msg.min_range = profile_minimum_range;
-    msg.max_range = range;
+    msg.max_range = profile_maximum_range;
     msg.range = profile_range;
     profile_range_raw_pub_.publish(msg);
 	}
@@ -246,7 +246,7 @@ class imagenex_echosounder {
   void getConfig() {
     bool valid_config = true;
 
-    valid_config = valid_config && ros::param::getCached("~range", range);
+    valid_config = valid_config && ros::param::getCached("~profile_maximum_range", profile_maximum_range);
     valid_config = valid_config && ros::param::getCached("~profile_minimum_range", profile_minimum_range);
     valid_config = valid_config && ros::param::getCached("~gain", gain);
     valid_config = valid_config && ros::param::getCached("~pulse_length", pulse_length);
