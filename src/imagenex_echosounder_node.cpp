@@ -71,6 +71,7 @@ class imagenex_echosounder {
   int sample_vector_size, pulse_length,loop_time_step;
   unsigned char buffer_tx[27];
   unsigned char buffer_rx[513];
+  bool firstime=true;
 
   void checkParams() {
     //profile_minimum_range
@@ -118,7 +119,8 @@ class imagenex_echosounder {
     buffer_tx[23] = 0;
     buffer_tx[24] = delay/2;			
     buffer_tx[25] = 0;					
-    buffer_tx[26] = 0xFD;				
+    buffer_tx[26] = 0xFD;			
+    firstime=true;	
 	}
 
 
@@ -160,7 +162,13 @@ class imagenex_echosounder {
     profile_range = 0.01 * float(((buffer_rx[9] & 0x7F) << 7) | (buffer_rx[8] & 0x7F)); // this decodification is equal to the one specified in the datasheet
     data_bytes = float(((buffer_rx[11] & 0x7F) << 7) | (buffer_rx[10] & 0x7F)); // this decodification is equal to the one specified in the datasheet
     ROS_INFO(" profile_range: %f",profile_range);
+    ROS_INFO("previous_profile_range %f", previous_profile_range);
     ROS_INFO(" data_bytes: %f",data_bytes);
+    if (firstime){
+      previous_profile_range=profile_range;
+      firstime=false;
+    }
+
 	}
 
   void filterProfile() {
@@ -191,9 +199,10 @@ class imagenex_echosounder {
 
     // if the echosounder is not lost, and the difference in range between consecutive samples, and "profundidad" fullfills all requirements , publish the "filtered" sample. 
     // IMPORTANT: do not consider altitudes of exactly 0.5 since they are outliers caused when the sensor approximates to its lowest range. DEPTHS LOWER THAN 0.5 ARE NOT RELIABLE. MINIMUM RANGE DETECTABLE = 0.5 M
+
     if (!gotlost and (diff_ranges<range_percentage) and (profile_range != 0) and (profile_range <= profile_maximum_range) and (profile_range > profile_minimum_range)) {
       profile_range_filtered_pub_.publish(msg);
-      ////ROS_WARN("altitude filtered published");
+      ROS_INFO("ecosound no lost, altitude filtered published");
       previous_profile_range=profile_range; // updating the value of this variable only when the message is published 
       //avoids the possibility of having 2 or 3 consecutive outliers, assuming that the vehicle altitude will not change abruptly   
     } 
@@ -201,6 +210,7 @@ class imagenex_echosounder {
     // far from the last stored and valid range, and this will prevent the publication of further range samples WHEN IT RECOVERS. So, lets publish new range data after the sensor recovers. 
     // how will we know that the sensor has recovered ? it gotlost ("profundidad = 0"), but the "profundidad" is again <> 0 (recovered !!!), and in the range of accepted values. 
     if (gotlost and (profile_range != 0) and (profile_range <= profile_maximum_range) and (profile_range >= profile_minimum_range)) {
+      ROS_INFO("got lost, profile_range recovered, publish filtered range again");
       profile_range_filtered_pub_.publish(msg); // publish next range after recovered 
       previous_profile_range=profile_range; // initialize the value of profundidad_anterior with the last published range
       gotlost=false;    
