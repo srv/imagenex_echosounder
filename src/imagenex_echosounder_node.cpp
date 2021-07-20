@@ -2,6 +2,7 @@
 #include "ros/ros.h"
 #include "sensor_msgs/Range.h"
 #include "std_msgs/UInt8MultiArray.h"
+#include "std_msgs/Float32MultiArray.h"
 #include "TimeoutSerial.h"
 #include <numeric>      // std::accumulate
 
@@ -32,6 +33,7 @@ class imagenex_echosounder {
     data_bytes_raw_pub_ = nhp_.advertise<sensor_msgs::Range>("data_bytes_raw", 1);
     profile_range_filtered_pub_ = nhp_.advertise<sensor_msgs::Range>("profile_range_filtered", 1); 
     profile_rx_raw = nhp_.advertise<std_msgs::UInt8MultiArray>("profile_rx_raw", 1); 
+    profile_rx_raw_float = nhp_.advertise<std_msgs::Float32MultiArray>("profile_rx_raw_float", 1);
 
     //Set serial
     serial.open(devname,115200); // open serial port and set it velocity.    
@@ -54,6 +56,7 @@ class imagenex_echosounder {
   ros::Publisher profile_range_filtered_pub_;
   ros::Publisher data_bytes_raw_pub_;
   ros::Publisher profile_rx_raw;
+  ros::Publisher profile_rx_raw_float;
   ros::Timer timer_;
   TimeoutSerial serial;
   
@@ -129,6 +132,7 @@ class imagenex_echosounder {
   void read() {
 	  try {
       serial.read(reinterpret_cast<char*>(buffer_rx), sizeof(buffer_rx));
+      ROS_INFO("Hello there");
     } 
     catch (const std::exception &exc){
       ROS_WARN("Read exception");
@@ -210,10 +214,13 @@ class imagenex_echosounder {
   void publish() {
     // Publish RX
     std_msgs::UInt8MultiArray rx_arr;
+    std_msgs::Float32MultiArray rx_arr_float;
     for (int i=0; i<=513;i++){
       rx_arr.data.push_back(buffer_rx[i]);
+      rx_arr_float.data.push_back(float(buffer_rx[i]));
     }
     profile_rx_raw.publish(rx_arr);
+    profile_rx_raw_float.publish(rx_arr_float);
 
     // Publish range raw
     sensor_msgs::Range msg;
@@ -254,7 +261,6 @@ class imagenex_echosounder {
     valid_config = valid_config && ros::param::getCached("~data_points", data_points);
     valid_config = valid_config && ros::param::getCached("~profile", profile);
     valid_config = valid_config && ros::param::getCached("~timeoutSerial", timeoutSerial);
-    valid_config = valid_config && ros::param::getCached("~timerDuration", timerDuration);
     valid_config = valid_config && ros::param::getCached("~absorption", absorption);
     valid_config = valid_config && ros::param::getCached("~range_percentage", range_percentage);
     valid_config = valid_config && ros::param::getCached("~sample_vector_size", sample_vector_size);
