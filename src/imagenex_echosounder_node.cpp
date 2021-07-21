@@ -27,6 +27,8 @@ class imagenex_echosounder {
     ROS_INFO("range percentage: %f", range_percentage);
     ROS_INFO("sample_vector_size: %i", sample_vector_size);
     ROS_INFO("devname: %s", devname.c_str());
+    ROS_INFO("num_samples_not_published: %i", num_samples_not_published);
+    
 
     //Publishers
     profile_range_raw_pub_ = nhp_.advertise<sensor_msgs::Range>("profile_range_raw", 1); 
@@ -63,7 +65,8 @@ class imagenex_echosounder {
   int64_t seq_;
   double profile_minimum_range, profile_maximum_range, profile_range_high_byte, profile_range_low_byte, profile_range, old_profile_range,range, previous_profile_range;
   double data_bytes_high_byte, data_bytes_low_byte, data_bytes, timerDuration, idle_time, fov;
-  int gain, absorption,long_pulso,delay,data_points,profile,timeoutSerial; 
+  int gain, absorption,long_pulso,delay,data_points,profile,timeoutSerial,num_samples_not_published;
+  int bad_sample_counter=-1; 
   int DataBytes12, DataBytes13, DataBytes14, DataBytes15, DataBytes16;
   int DataBytes17, DataBytes18, DataBytes19, DataBytes20, DataBytes21;
   std::string devname, frame_id;
@@ -203,21 +206,36 @@ class imagenex_echosounder {
 
     // if the echosounder is not lost, and the difference in range between consecutive samples, and "profundidad" fullfills all requirements , publish the "filtered" sample. 
     // IMPORTANT: do not consider altitudes of exactly 0.5 since they are outliers caused when the sensor approximates to its lowest range. DEPTHS LOWER THAN 0.5 ARE NOT RELIABLE. MINIMUM RANGE DETECTABLE = 0.5 M
+    ROS_INFO(" diff_ranges: %f",diff_ranges);
+    ROS_INFO(" gotlost: %i",gotlost);
 
     if (!gotlost and (diff_ranges<range_percentage) and (profile_range != 0) and (profile_range <= profile_maximum_range) and (profile_range > profile_minimum_range)) {
+      bad_sample_counter=-1;
       profile_range_filtered_pub_.publish(msg);
       ROS_INFO("ecosound no lost, altitude filtered published");
       previous_profile_range=profile_range; // updating the value of this variable only when the message is published 
       //avoids the possibility of having 2 or 3 consecutive outliers, assuming that the vehicle altitude will not change abruptly   
-    } 
+     
     // on the other hand, if the sensor gets lost (value ==> 0.00) during a certain period, the new data could be 
     // far from the last stored and valid range, and this will prevent the publication of further range samples WHEN IT RECOVERS. So, lets publish new range data after the sensor recovers. 
     // how will we know that the sensor has recovered ? it gotlost ("profundidad = 0"), but the "profundidad" is again <> 0 (recovered !!!), and in the range of accepted values. 
-    if (gotlost and (profile_range != 0) and (profile_range <= profile_maximum_range) and (profile_range >= profile_minimum_range)) {
+    }else if (gotlost and (profile_range != 0) and (profile_range <= profile_maximum_range) and (profile_range >= profile_minimum_range)) {
       ROS_INFO("got lost, profile_range recovered, publish filtered range again");
       profile_range_filtered_pub_.publish(msg); // publish next range after recovered 
       previous_profile_range=profile_range; // initialize the value of profundidad_anterior with the last published range
-      gotlost=false;    
+      gotlost=false;  
+      bad_sample_counter=-1;
+
+    }else{
+      //previous_profile_range not updated
+        bad_sample_counter++;
+        ROS_INFO("Elseee 1!!!!");
+
+      if((bad_sample_counter>num_samples_not_published) and (profile_range != 0) and (profile_range <= profile_maximum_range) and (profile_range >= profile_minimum_range) ){
+        bad_sample_counter=-1;
+        previous_profile_range=profile_range;
+        ROS_INFO("UPDATING previous_profile rangeeeeeeeeeeeeeeeeeeeeee");
+      }  
     }
 	}
 
@@ -278,6 +296,7 @@ class imagenex_echosounder {
     valid_config = valid_config && ros::param::getCached("~idle_time", idle_time);
     valid_config = valid_config && ros::param::getCached("~frame_id", frame_id);
     valid_config = valid_config && ros::param::getCached("~fov", fov);
+    valid_config = valid_config && ros::param::getCached("~num_samples_not_published", num_samples_not_published);
     // Shutdown if not valid
     if (!valid_config) {
         ROS_FATAL_STREAM("Shutdown due to invalid config parameters!");
