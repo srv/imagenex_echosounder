@@ -43,8 +43,6 @@ imagenex_echosounder:
   profile: 0 # (ON - 1, OFF - 0)
   absorption: 20 # TODO Remove, fixed to 20
   timeoutSerial: 1
-  range_percentage: 20
-  sample_vector_size: 20
   devname: "/dev/serial/by-id/usb-FTDI_UT232R_FT2D3911-if00-port0"
   idle_time: 0.05
   frame_id: echosounder
