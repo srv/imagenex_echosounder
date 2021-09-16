@@ -135,12 +135,12 @@ class imagenex_echosounder {
 	}
 
   void read() {
-	  try {
+	 try {
       serial.read(reinterpret_cast<char*>(buffer_rx), sizeof(buffer_rx));
-      ROS_INFO("Hello there");
+      ROS_INFO("Read succsesfully");
     } 
     catch (const std::exception &exc){
-      ROS_WARN("Read exception");
+     ROS_WARN("Read exception");
     }
 	}
 
